@@ -74,6 +74,8 @@ superseded the numbered set. See `SPMS-METHODOLOGY` for the delivery-methodology
 | `SPMS-STD-SEC` | Security Architecture Standard | Tenant isolation model, ABAC/RBAC evaluation order, field-level security, service identity, secret-reference handling, audit log tamper resistance, export-control enforcement, and AI retrieval permission boundaries |
 | `SPMS-STD-MIG` | Migration & Import Strategy Standard | Shared import pipeline (parse/validate/map/dry-run/commit), ID mapping table, reconciliation, and rollback framework for all module importers |
 | `SPMS-STD-MODULE` | Shared Module Requirements Standard | Canonical user types, role model, common UI patterns, shared NFR defaults, shared audit/import/export/security requirements; authoritative source for boilerplate common to all functional module specs |
+| `SPMS-STD-INVARIANTS` | Substrate Correctness Invariants Standard | Seven formal substrate invariants (INV-001–007) with property-based verification methods, CI phase gates, and ownership assignments; structural mitigation for RISK-001 and RISK-004 |
+| `SPMS-STD-CONFIG` | Configuration Governance Standard | Configuration taxonomy (Fixed / Canonical-constrained / Free), tenant-divergence consistency guardrails, configuration change governance, and configuration baselining; structural mitigation for RISK-011 |
 
 # 4a. Programme documents
 
@@ -81,6 +83,7 @@ superseded the numbered set. See `SPMS-METHODOLOGY` for the delivery-methodology
 |---|---|---|
 | `SPMS-THINTHREAD` | Thin Governed Thread Acceptance Suite | Formalises the thin governed thread as 10 executable acceptance test scenarios (TGT-001–TGT-010); invariant smoke test for every phase exit from Phase 2 onward |
 | `SPMS-UX` | UI/UX Information Architecture | Navigation model, workspace hierarchy, queue semantics, global search, record detail layout, graph exploration UX, dashboard strategy, and admin configuration UX |
+| `SPMS-SCOPE` | Scope & Prioritisation Register | Central rollup of all 158 capability priorities across 19 components; governance-profile × capability-inclusion matrix; per-phase scope locks; deferral register; structural mitigation for RISK-005 |
 
 # 5. Dependency overview
 

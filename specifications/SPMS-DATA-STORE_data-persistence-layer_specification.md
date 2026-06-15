@@ -1279,6 +1279,7 @@ Implement this component as part of a modular monolith with strict internal boun
 - Object storage references must include retention class, classification, hash, owner, and related record IDs.
 - Rebuild procedures must be tested and documented for graph, search, vector, and metrics projections.
 - The transactional outbox pattern, projection consumption contract, and rebuild protocol for all derived stores are governed by `SPMS-STD-EVENT`.
+- Substrate correctness invariants for this component (INV-003 graph↔relational consistency; INV-005 import reconciliation correctness; INV-006 permission-aware search consistency; INV-007 event-projection convergence) are defined and gated by `SPMS-STD-INVARIANTS`.
 
 ## 22.1 Source Alignment Notes
 

@@ -975,3 +975,4 @@ This specification covers the requested module scope: Evidence registry, Object 
 - Immutable storage rules must prevent silent rewriting of approved evidence and audit events.
 - Evidence freshness rules mark evidence stale when linked requirements, code, configuration, environment, control, or release changes.
 - Audit package format must support ZIP plus manifest, hashes, metadata, and human-readable reports.
+- Substrate correctness invariants for this component (INV-001 audit append-only + hash chain; INV-002 historical reconstruction fidelity) are defined and gated by `SPMS-STD-INVARIANTS`.

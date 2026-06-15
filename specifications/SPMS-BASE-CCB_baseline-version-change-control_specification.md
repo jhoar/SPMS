@@ -1278,6 +1278,7 @@ Implement this component as part of a modular monolith with strict internal boun
 - Every baseline must identify included object IDs, versions, relationship state, evidence, approval records, and creation criteria.
 - Changes to approved baselines require change-control workflow unless governance profile explicitly allows lightweight update.
 - Baseline comparison must preserve added, removed, changed, unchanged, waived, and suspect states.
+- Substrate correctness invariants for this component (INV-002 historical reconstruction fidelity; INV-004 baseline immutability) are defined and gated by `SPMS-STD-INVARIANTS`.
 
 ## 22.1 Source Alignment Notes
 

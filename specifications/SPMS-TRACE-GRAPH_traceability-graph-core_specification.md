@@ -971,3 +971,4 @@ This specification covers the requested module scope: Relationship registry, Bid
 - Graph query model must support bounded traversal, matrix generation, topology views, and historical snapshots; the Historical Graph Explorer must allow auditors to traverse the graph as it existed at any named baseline, release, deployment, or audit-period boundary without modifying live data.
 - Suspect link algorithm marks downstream links suspect when approved upstream records change.
 - Impact analysis must include records, evidence, releases, environments, customers, and controls.
+- Substrate correctness invariants for this component (INV-003 graph↔relational consistency; INV-006 permission-aware search consistency) are defined and gated by `SPMS-STD-INVARIANTS`.
