@@ -975,3 +975,4 @@ This specification covers the requested module scope: Source and change intake, 
 - Pipeline-as-code format must support templates, parameters, policies, stages, jobs, and matrix builds.
 - Artifact promotion must promote immutable artifacts rather than rebuilding for each environment.
 - Build provenance must capture source, dependencies, toolchain, runner, pipeline definition, tests, scans, signatures, and approvals.
+- Import and migration for this component must follow the shared pipeline defined in `SPMS-STD-MIG`.

@@ -1278,6 +1278,7 @@ Implement this component as part of a modular monolith with strict internal boun
 - The relational store is authoritative for records; graph/search/metrics are projections and must be rebuildable.
 - Object storage references must include retention class, classification, hash, owner, and related record IDs.
 - Rebuild procedures must be tested and documented for graph, search, vector, and metrics projections.
+- The transactional outbox pattern, projection consumption contract, and rebuild protocol for all derived stores are governed by `SPMS-STD-EVENT`.
 
 ## 22.1 Source Alignment Notes
 

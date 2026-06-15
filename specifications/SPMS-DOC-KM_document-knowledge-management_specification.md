@@ -979,3 +979,4 @@ This specification covers the requested module scope: Content creation and editi
 - Knowledge graph links must connect documents, decisions, requirements, issues, tests, releases, assets, and evidence.
 - Publication workflow must support internal, customer, partner, developer, and public channels.
 - Stale content checks must detect overdue reviews, missing owners, broken links, duplicate/conflicting content, and low-quality pages.
+- Import and migration for this component must follow the shared pipeline defined in `SPMS-STD-MIG`.

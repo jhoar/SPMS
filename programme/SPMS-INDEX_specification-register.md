@@ -66,10 +66,21 @@ superseded the numbered set. See `SPMS-METHODOLOGY` for the delivery-methodology
 |---|---|---|
 | `SPMS-INDEX` | Specification Register | This document; authoritative source statement |
 | `SPMS-STD-ID` | Identifier & Naming Standard | Global identifier scheme |
-| `SPMS-STD-SCALE` | Scale Envelope Standard | Quantified scale behind NFR targets |
-| `SPMS-DOMAIN-MODEL` | Canonical Domain Model & Relationship Registry | Single record model and link types |
+| `SPMS-STD-SCALE` | Scale Envelope Standard | Quantified scale behind NFR targets; §5 defines Minimum Viable Governed Deployment |
+| `SPMS-DOMAIN-MODEL` | Canonical Domain Model & Relationship Registry | Single record model, link types, and §7 canonical entity schemas |
 | `SPMS-METHODOLOGY` | Delivery Methodology Reconciliation Note | Resolves planning-document conflict |
 | `SPMS-DELIVERY` | Delivery Plan & Risk Register | Effort, staffing, timeline, risk, thin governed thread |
+| `SPMS-STD-EVENT` | Event & Outbox Model Standard | Transactional outbox pattern, event envelope schema, projection consumption contract, idempotency, retry/dead-letter, and rebuild protocol |
+| `SPMS-STD-SEC` | Security Architecture Standard | Tenant isolation model, ABAC/RBAC evaluation order, field-level security, service identity, secret-reference handling, audit log tamper resistance, export-control enforcement, and AI retrieval permission boundaries |
+| `SPMS-STD-MIG` | Migration & Import Strategy Standard | Shared import pipeline (parse/validate/map/dry-run/commit), ID mapping table, reconciliation, and rollback framework for all module importers |
+| `SPMS-STD-MODULE` | Shared Module Requirements Standard | Canonical user types, role model, common UI patterns, shared NFR defaults, shared audit/import/export/security requirements; authoritative source for boilerplate common to all functional module specs |
+
+# 4a. Programme documents
+
+| Doc ID | Title | Purpose |
+|---|---|---|
+| `SPMS-THINTHREAD` | Thin Governed Thread Acceptance Suite | Formalises the thin governed thread as 10 executable acceptance test scenarios (TGT-001–TGT-010); invariant smoke test for every phase exit from Phase 2 onward |
+| `SPMS-UX` | UI/UX Information Architecture | Navigation model, workspace hierarchy, queue semantics, global search, record detail layout, graph exploration UX, dashboard strategy, and admin configuration UX |
 
 # 5. Dependency overview
 

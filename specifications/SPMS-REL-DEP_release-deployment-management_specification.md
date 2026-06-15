@@ -979,3 +979,4 @@ This specification covers the requested module scope: Release planning and scope
 - Deployment strategy must support blue/green, canary, rolling, phased, feature-flagged, ring-based, and emergency hotfix paths.
 - Rollback must define trigger criteria, previous version restoration, database/data strategy, validation, and post-rollback evidence.
 - Operational handover must include monitoring, runbooks, support readiness, known issues, and acceptance confirmation.
+- Import and migration for this component must follow the shared pipeline defined in `SPMS-STD-MIG`.

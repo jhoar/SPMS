@@ -1278,6 +1278,7 @@ Implement this component as part of a modular monolith with strict internal boun
 - Every integration write must be attributable to an integration actor and visible in audit history.
 - Connectors must support dry-run and validation modes for controlled imports.
 - Event consumers must be idempotent and tolerate out-of-order delivery where applicable.
+- The transactional outbox pattern, event envelope schema, projection consumption contract, idempotency requirements, retry/dead-letter semantics, and rebuild protocol are governed by `SPMS-STD-EVENT`.
 
 ## 22.1 Source Alignment Notes
 

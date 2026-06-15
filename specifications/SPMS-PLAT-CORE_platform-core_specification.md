@@ -981,3 +981,4 @@ This specification covers the requested module scope: Tenant and workspace manag
 - Identity must support SSO/OIDC/SAML/LDAP, local identities where configured, groups, service accounts, and external collaborators.
 - Permission model must support RBAC, ABAC, object-level rules, field restrictions, and classification-aware access.
 - Metadata schema and taxonomy services must be common across modules for consistent reporting and search.
+- Security architecture, tenant isolation model, ABAC/RBAC evaluation order, field-level security, service identity, secret-reference handling, audit log tamper resistance, export-control enforcement, and AI retrieval permission boundaries are governed by `SPMS-STD-SEC`.

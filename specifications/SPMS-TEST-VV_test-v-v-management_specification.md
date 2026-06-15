@@ -978,3 +978,4 @@ This specification covers the requested module scope: Test and V&V planning, Tes
 
 - Component-specific rules must be refined during detailed design.
 - All controlled behavior must use shared workflow, traceability, evidence, audit, and reporting services.
+- Import and migration for this component must follow the shared pipeline defined in `SPMS-STD-MIG`.

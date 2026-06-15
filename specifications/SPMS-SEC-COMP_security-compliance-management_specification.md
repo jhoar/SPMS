@@ -981,3 +981,4 @@ This specification covers the requested module scope: Security governance and co
 - Vulnerability SLA matrix must vary by severity, exploitability, asset criticality, environment, and active exploitation.
 - Exception expiry rules must require review, renewal, compensating controls, and closure when fixed.
 - Vulnerability Intake API must accept SARIF (Static Analysis Results Interchange Format v2.1.0) as a mandatory inbound format from all security scanner and CI/CD integrations; additional proprietary formats are permitted alongside SARIF.
+- Import and migration for this component must follow the shared pipeline defined in `SPMS-STD-MIG`.

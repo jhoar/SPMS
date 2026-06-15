@@ -979,3 +979,4 @@ This specification covers the requested module scope: Requirement capture and in
 - ReqIF import/export should preserve IDs, hierarchy, attributes, links, baselines, and review state where available.
 - Verification method taxonomy must include test, analysis, inspection, demonstration, simulation, review, certification, and audit.
 - Requirement wording standards should support shall/should/may rules and controlled vocabulary.
+- Import and migration for this component must follow the shared pipeline defined in `SPMS-STD-MIG`.

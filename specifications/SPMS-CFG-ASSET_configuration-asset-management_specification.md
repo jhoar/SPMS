@@ -979,3 +979,4 @@ This specification covers the requested module scope: Configuration item registr
 - Drift workflow must classify drift, investigate, approve as intended, remediate, rollback, waive, or create a change.
 - Discovery must reconcile manual, cloud, Git/IaC, CI/CD, monitoring, and scanner sources.
 - Dependency impact must support failure, change, vulnerability, and end-of-life analysis.
+- Import and migration for this component must follow the shared pipeline defined in `SPMS-STD-MIG`.
