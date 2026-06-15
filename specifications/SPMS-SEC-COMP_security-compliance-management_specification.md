@@ -248,7 +248,7 @@ Security & Compliance Management is a functional module in the modular Software 
 | Preconditions | Actor is authenticated; permissions and workflow state allow the operation; required upstream records exist where applicable. |
 | Postconditions | Record state, links, evidence, events, metrics, and audit history are consistent and queryable. |
 | Main workflow | Create or select record; validate required fields; apply workflow/policy rules; update relationships; collect evidence; notify affected users; emit audit/event records. |
-| Alternate workflows | Bulk import; API update; automation-triggered update; delegated approval; waiver/deviation route; read-only external collaboration. |
+| Alternate workflows | Bulk import; API update; automation-triggered update; delegated approval; waiver/deviation route; read-only external collaboration; SARIF import (Static Analysis Results Interchange Format — mandated for all security scanner integrations). |
 | Error / exception handling | Reject invalid transitions; record validation errors; support rollback where safe; create issue/NCR for controlled failures; preserve failed automation evidence. |
 | Related records | Control, Security requirement, Risk, Threat model, Vulnerability; approvals; baselines; evidence; trace links; reports. |
 | Required evidence | Defined by governance profile; may include approval records, review notes, generated reports, logs, exports, or external tool evidence. |
@@ -478,6 +478,7 @@ Records must support applicability by project, product, release, customer, tenan
 | Governance profile | Description | Typical use |
 |---|---|---|
 | Lightweight | Minimal review and evidence. | Small internal project. |
+| Low-risk bulk | Automated rule-based approval for bulk, low-risk items (e.g. minor metadata updates) when all integrity checks pass; full audit trail maintained; escalates to Standard on any check failure. | Bulk metadata corrections, tag updates, minor field amendments. |
 | Standard | Normal review, approval, and evidence. | Typical product/project. |
 | Controlled | Formal baselines, approvals, evidence, audit. | Customer, regulated, or high-risk work. |
 | Critical | Strong separation of duties, independent assurance, strict gates. | Security/safety/business-critical systems. |
@@ -979,3 +980,4 @@ This specification covers the requested module scope: Security governance and co
 - Control mappings should support internal controls and external frameworks such as ISO 27001, SOC 2, NIST, CIS, GDPR, and customer-specific obligations.
 - Vulnerability SLA matrix must vary by severity, exploitability, asset criticality, environment, and active exploitation.
 - Exception expiry rules must require review, renewal, compensating controls, and closure when fixed.
+- Vulnerability Intake API must accept SARIF (Static Analysis Results Interchange Format v2.1.0) as a mandatory inbound format from all security scanner and CI/CD integrations; additional proprietary formats are permitted alongside SARIF.

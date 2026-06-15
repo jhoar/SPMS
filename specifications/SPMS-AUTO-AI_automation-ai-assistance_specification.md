@@ -477,6 +477,7 @@ Records must support applicability by project, product, release, customer, tenan
 | Governance profile | Description | Typical use |
 |---|---|---|
 | Lightweight | Minimal review and evidence. | Small internal project. |
+| Low-risk bulk | Automated rule-based approval for bulk, low-risk items (e.g. minor metadata updates) when all integrity checks pass; full audit trail maintained; escalates to Standard on any check failure. | Bulk metadata corrections, tag updates, minor field amendments. |
 | Standard | Normal review, approval, and evidence. | Typical product/project. |
 | Controlled | Formal baselines, approvals, evidence, audit. | Customer, regulated, or high-risk work. |
 | Critical | Strong separation of duties, independent assurance, strict gates. | Security/safety/business-critical systems. |
@@ -651,14 +652,14 @@ The component must support reconstruction of state at a specific date/time, name
 | AI function | Allowed? | Human approval required? | Notes |
 |---|---|---|---|
 | Summarization | Yes | No | Summarize records, evidence, comments, logs, and reports. |
-| Draft generation | Yes | Yes | Draft records, reports, decisions, release notes, test cases, or responses. |
-| Classification suggestion | Yes | Yes / No | Suggest types, severity, priority, owners, controls, tags. |
+| Draft generation | Yes | Yes | Draft records, reports, decisions, release notes, test cases, or responses; must include a Grounding Attestation listing the IDs and versions of all source records used as context. |
+| Classification suggestion | Yes | Yes / No | Suggest types, severity, priority, owners, controls, tags; Grounding Attestation required for suggestions influencing controlled record state. |
 | Duplicate detection | Yes | No | Find similar records and propose merge/link options. |
 | Traceability suggestion | Yes | Yes | Suggest links but do not create controlled links silently. |
-| Impact analysis assistance | Yes | Yes | Summarize likely impact from graph and evidence. |
+| Impact analysis assistance | Yes | Yes | Summarize likely impact from graph and evidence; must include a Grounding Attestation citing the exact record versions queried. |
 | Evidence gap detection | Yes | No / Yes | Identify missing, stale, or weak evidence. |
 | Natural-language Q&A | Yes | No | Must cite sources and respect permissions. |
-| Automated approval | No | Not allowed | AI must not approve controlled records. |
+| Automated approval | No | Not allowed | AI must not approve controlled records. AI-generated proposals are placed in a human-reviewable staging state; acceptance is performed exclusively by an authorised actor via the governance engine (one-click proposal acceptance routes through the standard SPMS-WF-GOV state-change API, generating a full approval audit record). |
 
 ---
 
@@ -976,5 +977,6 @@ This specification covers the requested module scope: Rules engine and scheduled
 
 - Rules must be versioned, testable, observable, and auditable.
 - Policy-as-code must support dry-run, explainability, decisions, inputs, and evidence links.
-- AI answers must be grounded in permitted sources and cite source records.
+- AI answers must be grounded in permitted sources and cite source records; every AI-assisted draft, report, decision, or impact analysis must include a Grounding Attestation — a structured record listing the exact SPMS record IDs and version numbers used as retrieval context — that is stored as evidence linked to the produced output and made available for audit.
 - Human-in-the-loop controls must prevent AI from silently approving, waiving, accepting, or deleting controlled records.
+- One-click acceptance of AI-generated proposals must route through SPMS-WF-GOV state-change workflows; the acceptance action must be recorded as a human-actor approval event in SPMS-EVID-AUDIT.
