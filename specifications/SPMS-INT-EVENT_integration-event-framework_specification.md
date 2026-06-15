@@ -592,6 +592,7 @@ Coverage expectations for this component:
 | Governance profile | Description | Typical use |
 |---|---|---|
 | Lightweight | Minimal review and evidence. | Small internal project |
+| Low-risk bulk | Automated rule-based approval for bulk, low-risk items (e.g. minor metadata updates) when all integrity checks pass; full audit trail maintained; escalates to Standard on any check failure. | Bulk metadata corrections, tag updates, minor field amendments. |
 | Standard | Normal review, approval, and evidence. | Typical product/project |
 | Controlled | Formal baselines, approvals, evidence, audit. | Customer, regulated, or high-risk work |
 | Critical | Strong separation of duties, independent assurance, strict gates. | Security/safety/business-critical systems |
@@ -1277,6 +1278,7 @@ Implement this component as part of a modular monolith with strict internal boun
 - Every integration write must be attributable to an integration actor and visible in audit history.
 - Connectors must support dry-run and validation modes for controlled imports.
 - Event consumers must be idempotent and tolerate out-of-order delivery where applicable.
+- The transactional outbox pattern, event envelope schema, projection consumption contract, idempotency requirements, retry/dead-letter semantics, and rebuild protocol are governed by `SPMS-STD-EVENT`.
 
 ## 22.1 Source Alignment Notes
 

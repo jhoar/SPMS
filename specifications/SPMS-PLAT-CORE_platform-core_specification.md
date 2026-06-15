@@ -479,6 +479,7 @@ Records must support applicability by project, product, release, customer, tenan
 | Governance profile | Description | Typical use |
 |---|---|---|
 | Lightweight | Minimal review and evidence. | Small internal project. |
+| Low-risk bulk | Automated rule-based approval for bulk, low-risk items (e.g. minor metadata updates) when all integrity checks pass; full audit trail maintained; escalates to Standard on any check failure. | Bulk metadata corrections, tag updates, minor field amendments. |
 | Standard | Normal review, approval, and evidence. | Typical product/project. |
 | Controlled | Formal baselines, approvals, evidence, audit. | Customer, regulated, or high-risk work. |
 | Critical | Strong separation of duties, independent assurance, strict gates. | Security/safety/business-critical systems. |
@@ -980,3 +981,5 @@ This specification covers the requested module scope: Tenant and workspace manag
 - Identity must support SSO/OIDC/SAML/LDAP, local identities where configured, groups, service accounts, and external collaborators.
 - Permission model must support RBAC, ABAC, object-level rules, field restrictions, and classification-aware access.
 - Metadata schema and taxonomy services must be common across modules for consistent reporting and search.
+- Security architecture, tenant isolation model, ABAC/RBAC evaluation order, field-level security, service identity, secret-reference handling, audit log tamper resistance, export-control enforcement, and AI retrieval permission boundaries are governed by `SPMS-STD-SEC`.
+- Configuration governance — the taxonomy of fixed, canonical-constrained, and free configuration surfaces, consistency guardrails, and tenant divergence prevention — is governed by `SPMS-STD-CONFIG`.

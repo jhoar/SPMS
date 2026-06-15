@@ -473,6 +473,7 @@ Records must support applicability by project, product, release, customer, tenan
 | Governance profile | Description | Typical use |
 |---|---|---|
 | Lightweight | Minimal review and evidence. | Small internal project. |
+| Low-risk bulk | Automated rule-based approval for bulk, low-risk items (e.g. minor metadata updates) when all integrity checks pass; full audit trail maintained; escalates to Standard on any check failure. | Bulk metadata corrections, tag updates, minor field amendments. |
 | Standard | Normal review, approval, and evidence. | Typical product/project. |
 | Controlled | Formal baselines, approvals, evidence, audit. | Customer, regulated, or high-risk work. |
 | Critical | Strong separation of duties, independent assurance, strict gates. | Security/safety/business-critical systems. |
@@ -974,3 +975,4 @@ This specification covers the requested module scope: Evidence registry, Object 
 - Immutable storage rules must prevent silent rewriting of approved evidence and audit events.
 - Evidence freshness rules mark evidence stale when linked requirements, code, configuration, environment, control, or release changes.
 - Audit package format must support ZIP plus manifest, hashes, metadata, and human-readable reports.
+- Substrate correctness invariants for this component (INV-001 audit append-only + hash chain; INV-002 historical reconstruction fidelity) are defined and gated by `SPMS-STD-INVARIANTS`.

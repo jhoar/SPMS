@@ -75,16 +75,17 @@ vertical slice that does not jump ahead of its substrate (see `SPMS-METHODOLOGY`
 
 | ID | Risk | Likelihood | Impact | Response |
 |---|---|---|---|---|
-| `RISK-001` | Substrate (audit/reconstruction/graph) underestimated; later modules blocked | High | High | Spike Phases 3–4 early; thin thread as proof; senior ownership; explicit performance gates per `SPMS-STD-SCALE` |
+| `RISK-001` | Substrate (audit/reconstruction/graph) underestimated; later modules blocked | High | High | Spike Phases 3–4 early; thin thread as proof; senior ownership; explicit performance gates per `SPMS-STD-SCALE`; substrate invariants gated by `SPMS-STD-INVARIANTS` |
 | `RISK-002` | Foundation-first delays user-visible value; sponsor confidence erodes | Medium | High | Thin governed thread; monthly demos of substrate capability; staged funding tied to phase exit criteria |
 | `RISK-003` | Specifications re-diverge into parallel versions | Medium | High | Single register (`SPMS-INDEX`); linter in CI; domain model as sole source; controlled-change rule on shared docs |
-| `RISK-004` | Graph projection vs relational store consistency defects | Medium | High | Reconciliation tooling (plan §18.4); projection-consistency tests; rebuild-and-compare in nightly pipeline |
-| `RISK-005` | Scope creep across 19 components without prioritisation | High | Medium | "Required for minimal mode" flag per capability; Small-profile usable subset first; defer Should/Could |
+| `RISK-004` | Graph projection vs relational store consistency defects | Medium | High | Reconciliation tooling (plan §18.4); projection-consistency tests; rebuild-and-compare in nightly pipeline; invariants INV-003 and INV-007 in `SPMS-STD-INVARIANTS` |
+| `RISK-005` | Scope creep across 19 components without prioritisation | High | Medium | "Required for minimal mode" flag per capability; Small-profile usable subset first; defer Should/Could; central rollup and phase scope locks in `SPMS-SCOPE` |
 | `RISK-006` | NFR targets unmet at Large profile | Medium | Medium | `SPMS-STD-SCALE` soak tests per release candidate; partitioning and worker scaling designed in, not retrofitted |
 | `RISK-007` | AI assistance bypasses governance | Low | High | Human-in-the-loop enforced; AI writes proposals only; red-team tenant-leakage tests (`SPMS-AUTO-AI`) |
 | `RISK-008` | Detail in superseded numbered specs lost during reconciliation | Medium | Medium | `DETAIL-HARVEST-BACKLOG`; superseded set retained read-only; harvest before each module's detailed design |
 | `RISK-009` | Key-person dependency on substrate architects | Medium | Medium | Pair on substrate; ADRs; rotate review; document the hard parts first |
 | `RISK-010` | Estimates treated as commitments | Medium | Medium | Re-estimate at each phase boundary from actuals; this plan is planning-grade only |
+| `RISK-011` | Over-configuration / tenant divergence breaks cross-tenant reporting and audit consistency | Medium | High | Configuration taxonomy (Fixed / Canonical-constrained / Free) and consistency guardrails defined and enforced by `SPMS-STD-CONFIG`; per-specification R-001 elevated to programme risk |
 
 # 5. Recommended phasing adjustments
 

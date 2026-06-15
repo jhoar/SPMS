@@ -592,6 +592,7 @@ Coverage expectations for this component:
 | Governance profile | Description | Typical use |
 |---|---|---|
 | Lightweight | Minimal review and evidence. | Small internal project |
+| Low-risk bulk | Automated rule-based approval for bulk, low-risk items (e.g. minor metadata updates) when all integrity checks pass; full audit trail maintained; escalates to Standard on any check failure. | Bulk metadata corrections, tag updates, minor field amendments. |
 | Standard | Normal review, approval, and evidence. | Typical product/project |
 | Controlled | Formal baselines, approvals, evidence, audit. | Customer, regulated, or high-risk work |
 | Critical | Strong separation of duties, independent assurance, strict gates. | Security/safety/business-critical systems |
@@ -1277,6 +1278,7 @@ Implement this component as part of a modular monolith with strict internal boun
 - Every baseline must identify included object IDs, versions, relationship state, evidence, approval records, and creation criteria.
 - Changes to approved baselines require change-control workflow unless governance profile explicitly allows lightweight update.
 - Baseline comparison must preserve added, removed, changed, unchanged, waived, and suspect states.
+- Substrate correctness invariants for this component (INV-002 historical reconstruction fidelity; INV-004 baseline immutability) are defined and gated by `SPMS-STD-INVARIANTS`.
 
 ## 22.1 Source Alignment Notes
 

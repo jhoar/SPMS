@@ -114,3 +114,315 @@ component specification.
 The linter checks that component specifications reference (not redefine) the record model, use only
 registered link types in their "Required Trace Links" sections, and map their lifecycle states to
 §4. Adding a field, state, or link type is a Level 2 controlled change to this document.
+
+---
+
+# 7. Canonical Entity Schemas
+
+Concrete field-by-field schemas for the 17 canonical entities. Entities that are controlled records
+extend `Record` (§7.1) and inherit all Common Record Model fields (§3); their tables list only
+additional fields. Entities that are not controlled records (e.g. `AuditEvent`, `IntegrationEvent`,
+`TraceLink`) define their full field sets independently.
+
+All schemas are owned by the component listed in §2. Changes to any schema below are Level 2
+controlled changes to this document.
+
+## 7.1 Record (shared — realises the Common Record Model)
+
+This is the concrete storage realisation of §3. All module record types (Requirement, Issue,
+Document, etc.) are instances of `Record` with a component-specific `record_type` value and
+additional fields in `metadata`.
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `id` | string (SPMS-STD-ID format) | Yes | Immutable; globally unique within tenant | Stable for record lifetime |
+| `component` | string | Yes | Must match a registered component code | e.g. `SPMS-REQ-MGMT` |
+| `record_type` | string | Yes | Component-defined enum | e.g. `requirement`, `issue`, `document` |
+| `tenant_id` | string | Yes | Must match authenticated session tenant | Tenant isolation boundary |
+| `project_id` | string | No | Null for tenant-level records | Required for project-scoped records |
+| `title` | string | Yes | 1–500 characters | Human label |
+| `lifecycle_state` | string | Yes | Must be a value from §4 canonical state set | Transition rules from SPMS-WF-GOV |
+| `classification` | string | Yes | One of: `public`, `internal`, `confidential`, `restricted` | Governs access and export |
+| `owner_id` | string | Yes | Must resolve to an active User or Role | Accountable party |
+| `metadata` | object | No | Validated against `record_type` metadata schema | Extensible per module |
+| `version` | integer | Yes | Starts at 1; incremented on each controlled update | Optimistic concurrency lock |
+| `baseline_refs` | array of strings | No | Each entry is a Baseline `id` | Populated by SPMS-BASE-CCB |
+| `created_at` | timestamp (ISO 8601) | Yes | Immutable; set on creation | — |
+| `created_by` | string | Yes | Immutable; actor id at creation | — |
+| `updated_at` | timestamp (ISO 8601) | Yes | Updated on each controlled change | — |
+| `updated_by` | string | Yes | Actor id of last controlled change | — |
+| `superseded_by` | string | No | Id of superseding record; set on supersession | Never deletes history |
+
+---
+
+## 7.2 Platform Core entities (SPMS-PLAT-CORE)
+
+### Tenant
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `tenant_id` | string | Yes | Immutable; globally unique | Primary isolation boundary |
+| `name` | string | Yes | 1–200 characters; unique across platform | Display name |
+| `slug` | string | Yes | Lowercase alphanumeric + hyphens; unique; immutable after creation | URL-safe identifier |
+| `status` | string | Yes | One of: `active`, `suspended`, `archived` | Platform-level lifecycle |
+| `classification_policy` | string | Yes | Default classification for new records in this tenant | Overridable per project |
+| `governance_profile` | string | Yes | One of: `lightweight`, `low-risk-bulk`, `standard`, `controlled`, `critical` | Default for new projects |
+| `secret_manager_ref` | string | No | `secret:<provider>:<name>:<version>` format (SPMS-STD-SEC §6) | External secret manager config |
+| `sso_config_ref` | string | No | Reference to SSO/OIDC/SAML configuration | From integration config |
+| `created_at` | timestamp | Yes | Immutable | — |
+| `created_by` | string | Yes | Immutable; platform administrator id | — |
+| `updated_at` | timestamp | Yes | — | — |
+| `updated_by` | string | Yes | — | — |
+
+### Project
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `project_id` | string | Yes | Immutable; unique within tenant | — |
+| `tenant_id` | string | Yes | Foreign key to Tenant | — |
+| `name` | string | Yes | 1–200 characters; unique within tenant | — |
+| `slug` | string | Yes | Unique within tenant; immutable after creation | — |
+| `status` | string | Yes | One of: `active`, `archived`, `suspended` | — |
+| `governance_profile` | string | Yes | Inherits from Tenant; overridable | — |
+| `enabled_modules` | array of strings | Yes | Subset of registered component codes | Controls which module UIs/APIs are active |
+| `product_id` | string | No | Foreign key to Product (optional grouping) | — |
+| `created_at` | timestamp | Yes | Immutable | — |
+| `created_by` | string | Yes | Immutable | — |
+| `updated_at` | timestamp | Yes | — | — |
+| `updated_by` | string | Yes | — | — |
+
+### Product
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `product_id` | string | Yes | Immutable; unique within tenant | Optional portfolio grouping |
+| `tenant_id` | string | Yes | — | — |
+| `name` | string | Yes | 1–200 characters | — |
+| `status` | string | Yes | One of: `active`, `archived` | — |
+| `created_at` | timestamp | Yes | Immutable | — |
+| `created_by` | string | Yes | Immutable | — |
+
+### Team
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `team_id` | string | Yes | Immutable; unique within tenant | — |
+| `tenant_id` | string | Yes | — | — |
+| `name` | string | Yes | 1–200 characters | — |
+| `project_ids` | array of strings | No | Projects this team is assigned to | — |
+| `status` | string | Yes | One of: `active`, `archived` | — |
+| `created_at` | timestamp | Yes | Immutable | — |
+| `created_by` | string | Yes | Immutable | — |
+
+### User
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `user_id` | string | Yes | Immutable; unique within tenant | — |
+| `tenant_id` | string | Yes | — | — |
+| `identity_ref` | string | Yes | External identity provider subject identifier | SSO / OIDC sub claim |
+| `display_name` | string | Yes | 1–200 characters | — |
+| `email` | string | Yes | Valid email; unique within tenant | — |
+| `status` | string | Yes | One of: `active`, `suspended`, `archived` | — |
+| `classification_clearance` | string | Yes | One of: `public`, `internal`, `confidential`, `restricted` | Highest classification this user may access |
+| `team_ids` | array of strings | No | Teams this user belongs to | — |
+| `is_service_account` | boolean | Yes | Default false; true for automation actors | — |
+| `created_at` | timestamp | Yes | Immutable | — |
+| `created_by` | string | Yes | Immutable | — |
+| `updated_at` | timestamp | Yes | — | — |
+| `updated_by` | string | Yes | — | — |
+
+### Role
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `role_id` | string | Yes | Unique within tenant | — |
+| `tenant_id` | string | Yes | — | — |
+| `name` | string | Yes | One of canonical role names (SPMS-STD-MODULE §2) or custom | — |
+| `scope` | string | Yes | One of: `tenant`, `project`, `component` | Scope at which this role is assigned |
+| `is_system` | boolean | Yes | True for built-in roles; false for custom | System roles cannot be deleted |
+| `created_at` | timestamp | Yes | Immutable | — |
+
+### Permission
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `permission_id` | string | Yes | Unique within tenant | — |
+| `tenant_id` | string | Yes | — | — |
+| `principal_id` | string | Yes | User id, Team id, or Role id | Subject of the permission grant |
+| `principal_type` | string | Yes | One of: `user`, `team`, `role` | — |
+| `project_id` | string | No | Null for tenant-level permissions | — |
+| `component` | string | No | Null for cross-component permissions | — |
+| `role_id` | string | Yes | Granted role | — |
+| `granted_by` | string | Yes | Actor id of granting administrator | — |
+| `granted_at` | timestamp | Yes | Immutable | — |
+| `expires_at` | timestamp | No | Null for permanent grants | Required for delegated/time-bounded grants |
+
+---
+
+## 7.3 Governance entities (SPMS-WF-GOV)
+
+### Workflow
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `workflow_id` | string | Yes | Unique within tenant | — |
+| `tenant_id` | string | Yes | — | — |
+| `component` | string | Yes | Owning component code | — |
+| `record_type` | string | Yes | Record type this workflow governs | — |
+| `version` | integer | Yes | Incremented on each controlled update | — |
+| `governance_profile` | string | Yes | One of canonical governance profiles | — |
+| `states` | array of objects | Yes | Each: `{name, terminal, side_state}` | Must be a subset of §4 state set |
+| `transitions` | array of objects | Yes | Each: `{from_state, to_state, trigger, required_conditions, required_approvals, automatic_actions}` | — |
+| `gates` | array of objects | No | Each: `{gate_id, blocking, required_evidence, approvers}` | — |
+| `status` | string | Yes | One of: `draft`, `active`, `deprecated` | Only `active` workflows may be applied to records |
+| `created_at` | timestamp | Yes | Immutable | — |
+| `created_by` | string | Yes | Immutable | — |
+| `updated_at` | timestamp | Yes | — | — |
+| `updated_by` | string | Yes | — | — |
+
+### Approval
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `approval_id` | string | Yes | Unique within tenant | — |
+| `tenant_id` | string | Yes | — | — |
+| `record_id` | string | Yes | Id of the record requiring approval | — |
+| `record_type` | string | Yes | — | — |
+| `approval_type` | string | Yes | One of canonical approval types (SPMS-WF-GOV §8.2) | — |
+| `requested_by` | string | Yes | Actor id | — |
+| `requested_at` | timestamp | Yes | Immutable | — |
+| `required_approvers` | array of strings | Yes | User ids or Role ids | — |
+| `decisions` | array of objects | No | Each: `{approver_id, decision, decided_at, notes}` | `decision` one of: `approved`, `rejected`, `conditionally_approved` |
+| `status` | string | Yes | One of: `pending`, `approved`, `rejected`, `withdrawn`, `expired` | — |
+| `expiry` | timestamp | No | Null for non-expiring approvals | — |
+| `evidence_refs` | array of strings | No | Evidence record ids linked to this approval decision | — |
+
+---
+
+## 7.4 Evidence entities (SPMS-EVID-AUDIT)
+
+### Evidence
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `evidence_id` | string | Yes | Unique within tenant; immutable | — |
+| `tenant_id` | string | Yes | Immutable | — |
+| `record_id` | string | Yes | Id of the record this evidence supports | — |
+| `evidence_type` | string | Yes | One of: `document`, `test_result`, `scan_report`, `approval_record`, `export`, `screenshot`, `log`, `signature`, `external_reference` | — |
+| `title` | string | Yes | 1–500 characters | — |
+| `classification` | string | Yes | Inherits from linked record; may be overridden upward | — |
+| `object_ref` | string | No | Object storage reference for file-type evidence | Format: `<bucket>/<key>/<hash>` |
+| `content_hash` | string | No | SHA-256 of evidence file | Required when `object_ref` is set |
+| `retention_class` | string | Yes | One of: `standard`, `long`, `permanent` | Governs object storage WORM policy |
+| `uploaded_by` | string | Yes | Actor id; immutable | — |
+| `uploaded_at` | timestamp | Yes | Immutable | — |
+| `expires_at` | timestamp | No | Null for permanent evidence | Triggers re-validation or stale evidence alert |
+| `status` | string | Yes | One of: `valid`, `expired`, `superseded`, `revoked` | — |
+
+### AuditEvent
+
+`AuditEvent` records are append-only. No UPDATE or DELETE is permitted. See SPMS-STD-SEC §7 for tamper-resistance requirements.
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `event_id` | string (UUID v4) | Yes | Immutable; globally unique | Primary key; deduplication key for consumers |
+| `tenant_id` | string | Yes | Immutable | — |
+| `aggregate_id` | string | Yes | Id of the record or entity that changed | — |
+| `aggregate_type` | string | Yes | Record type or entity name | — |
+| `event_type` | string | Yes | Registered event type (e.g. `RecordCreated`, `StateChanged`, `ApprovalCompleted`) | — |
+| `actor_id` | string | Yes | User id or service id that caused the event | — |
+| `actor_type` | string | Yes | One of: `user`, `automation`, `system` | — |
+| `payload` | object | Yes | Event-type-specific detail; schema versioned | — |
+| `schema_version` | string | Yes | Semantic version of the payload schema | e.g. `1.0.0` |
+| `occurred_at` | timestamp (ISO 8601, microsecond precision) | Yes | Immutable; time of the originating mutation | — |
+| `prev_hash` | string | Yes | SHA-256 of the previous `AuditEvent` in tenant log | Hash chain for tamper resistance (SPMS-STD-SEC §7) |
+| `correlation_id` | string | No | Id linking causally related events | — |
+
+---
+
+## 7.5 Baseline entities (SPMS-BASE-CCB)
+
+### Baseline
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `baseline_id` | string | Yes | Unique within tenant; immutable | — |
+| `tenant_id` | string | Yes | Immutable | — |
+| `project_id` | string | Yes | — | — |
+| `name` | string | Yes | 1–200 characters; unique within project | — |
+| `description` | string | No | — | — |
+| `baseline_type` | string | Yes | One of: `functional`, `product`, `release`, `audit`, `custom` | — |
+| `members` | array of objects | Yes | Each: `{record_id, record_type, version}` — the exact version frozen | Immutable after baseline is sealed |
+| `status` | string | Yes | One of: `draft`, `sealed`, `superseded`, `archived` | Only `sealed` baselines may be used for reconstruction |
+| `sealed_at` | timestamp | No | Set when status transitions to `sealed`; immutable thereafter | — |
+| `sealed_by` | string | No | Actor id; immutable | — |
+| `approval_refs` | array of strings | No | Approval ids for the baseline approval | — |
+| `evidence_refs` | array of strings | No | Evidence supporting the baseline | — |
+| `created_at` | timestamp | Yes | Immutable | — |
+| `created_by` | string | Yes | Immutable | — |
+
+### Version
+
+A `Version` is an immutable snapshot of a single `Record` at a specific `version` integer. Versions are created automatically on each controlled update.
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `version_id` | string | Yes | Unique within tenant | — |
+| `tenant_id` | string | Yes | Immutable | — |
+| `record_id` | string | Yes | Id of the parent record | — |
+| `version_number` | integer | Yes | Matches `Record.version` at capture time | — |
+| `snapshot` | object | Yes | Full field snapshot of the Record at this version | Immutable |
+| `change_summary` | string | No | Human-readable description of what changed | — |
+| `changed_by` | string | Yes | Actor id; immutable | — |
+| `changed_at` | timestamp | Yes | Immutable | — |
+
+---
+
+## 7.6 Traceability entities (SPMS-TRACE-GRAPH)
+
+### TraceLink
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `link_id` | string | Yes | Unique within tenant; immutable | — |
+| `tenant_id` | string | Yes | Immutable | — |
+| `project_id` | string | No | Null for cross-project links | — |
+| `link_type` | string | Yes | Must be a registered type from §5 | e.g. `SPMS-TRACE-GRAPH-REL-004` |
+| `source_id` | string | Yes | Id of the source record | — |
+| `source_type` | string | Yes | Record type of the source | — |
+| `source_version` | integer | Yes | Version of the source at link creation | Used for suspect-link detection |
+| `target_id` | string | Yes | Id of the target record | — |
+| `target_type` | string | Yes | Record type of the target | — |
+| `target_version` | integer | Yes | Version of the target at link creation | — |
+| `suspect` | boolean | Yes | Default false; set true when upstream record changes after link creation | — |
+| `suspect_reason` | string | No | Human-readable explanation; required when `suspect=true` | — |
+| `evidence_refs` | array of strings | No | Evidence supporting the relationship | — |
+| `created_by` | string | Yes | Actor id; immutable | — |
+| `created_at` | timestamp | Yes | Immutable | — |
+| `status` | string | Yes | One of: `active`, `superseded`, `retracted` | Retracted links are retained for audit |
+
+---
+
+## 7.7 Integration entities (SPMS-INT-EVENT)
+
+### IntegrationEvent
+
+`IntegrationEvent` is the outbox envelope written transactionally alongside each controlled mutation.
+See SPMS-STD-EVENT for the full outbox pattern and projection consumption contract.
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `event_id` | string (UUID v4) | Yes | Immutable; globally unique; deduplication key | — |
+| `tenant_id` | string | Yes | Immutable | — |
+| `aggregate_id` | string | Yes | Id of the mutated record or entity | — |
+| `aggregate_type` | string | Yes | Record type or entity name | — |
+| `event_type` | string | Yes | Registered event type (matches AuditEvent.event_type) | — |
+| `payload` | object | Yes | Event-type-specific; schema versioned | — |
+| `schema_version` | string | Yes | Semantic version of payload schema | — |
+| `actor_id` | string | Yes | Actor that caused the mutation | — |
+| `correlation_id` | string | No | Groups causally related events | — |
+| `causation_id` | string | No | `event_id` of the event that caused this one | — |
+| `occurred_at` | timestamp (ISO 8601, microsecond precision) | Yes | Immutable; time of originating mutation | — |
+| `published_at` | timestamp | No | Null until relay confirms delivery to event bus | Set by outbox relay process |
+| `status` | string | Yes | One of: `pending`, `published`, `dead-letter` | Managed by outbox relay |

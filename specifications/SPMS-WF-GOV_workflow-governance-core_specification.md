@@ -471,6 +471,7 @@ Records must support applicability by project, product, release, customer, tenan
 | Governance profile | Description | Typical use |
 |---|---|---|
 | Lightweight | Minimal review and evidence. | Small internal project. |
+| Low-risk bulk | Automated rule-based approval for bulk, low-risk items (e.g. minor metadata updates) when all integrity checks pass; full audit trail maintained; escalates to Standard on any check failure. | Bulk metadata corrections, tag updates, minor field amendments. |
 | Standard | Normal review, approval, and evidence. | Typical product/project. |
 | Controlled | Formal baselines, approvals, evidence, audit. | Customer, regulated, or high-risk work. |
 | Critical | Strong separation of duties, independent assurance, strict gates. | Security/safety/business-critical systems. |
@@ -972,3 +973,4 @@ This specification covers the requested module scope: Workflow engine, Approval 
 - Approval and gate decisions must be reusable across modules and produce evidence/audit records.
 - Delegation must be time-bounded, scoped, auditable, and compatible with SoD constraints.
 - SLA timers must support business calendars, pause/resume, escalations, and reporting.
+- The Low-risk bulk profile is defined as Level 1.5 — above Lightweight (no automation) but below Standard (full human review). It applies only to record types and field changes explicitly whitelisted by a project administrator; the rules engine must log each automated approval as a human-delegated automation event via SPMS-EVID-AUDIT.

@@ -477,6 +477,7 @@ Records must support applicability by project, product, release, customer, tenan
 | Governance profile | Description | Typical use |
 |---|---|---|
 | Lightweight | Minimal review and evidence. | Small internal project. |
+| Low-risk bulk | Automated rule-based approval for bulk, low-risk items (e.g. minor metadata updates) when all integrity checks pass; full audit trail maintained; escalates to Standard on any check failure. | Bulk metadata corrections, tag updates, minor field amendments. |
 | Standard | Normal review, approval, and evidence. | Typical product/project. |
 | Controlled | Formal baselines, approvals, evidence, audit. | Customer, regulated, or high-risk work. |
 | Critical | Strong separation of duties, independent assurance, strict gates. | Security/safety/business-critical systems. |
@@ -978,3 +979,4 @@ This specification covers the requested module scope: Content creation and editi
 - Knowledge graph links must connect documents, decisions, requirements, issues, tests, releases, assets, and evidence.
 - Publication workflow must support internal, customer, partner, developer, and public channels.
 - Stale content checks must detect overdue reviews, missing owners, broken links, duplicate/conflicting content, and low-quality pages.
+- Import and migration for this component must follow the shared pipeline defined in `SPMS-STD-MIG`.

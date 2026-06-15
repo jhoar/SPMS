@@ -328,14 +328,14 @@ Traceability Graph Core is a shared foundation service in the modular Software P
 | Field | Description |
 |---|---|
 | Capability ID | SPMS-TRACE-GRAPH-CAP-008 |
-| Purpose | Support historical graph snapshots within the Traceability Graph Core component. |
+| Purpose | Support historical graph snapshots within the Traceability Graph Core component, including an interactive Historical Graph Explorer that allows authorised auditors to visually traverse the relationship graph as it existed at any named baseline, release approval point, deployment event, or arbitrary date/time. |
 | Trigger | Manual / Scheduled / Event-driven / API / Integration / AI-assisted |
 | Primary users | Administrator; Owner; Contributor; Reviewer; Approver; Auditor; Automation actor |
 | Inputs | Traceability Graph Core records, related links, metadata, policy configuration, comments, evidence, and events. |
 | Outputs | Updated Traceability Graph Core records, state changes, evidence links, audit events, notifications, metrics, and reports. |
 | Preconditions | Actor is authenticated; permissions and workflow state allow the operation; required upstream records exist where applicable. |
 | Postconditions | Record state, links, evidence, events, metrics, and audit history are consistent and queryable. |
-| Main workflow | Create or select record; validate required fields; apply workflow/policy rules; update relationships; collect evidence; notify affected users; emit audit/event records. |
+| Main workflow | Create or select record; validate required fields; apply workflow/policy rules; update relationships; collect evidence; notify affected users; emit audit/event records; provide Historical Graph Explorer query interface that accepts a point-in-time or named baseline reference and renders the graph topology, node states, link types, and evidence status as of that moment. |
 | Alternate workflows | Bulk import; API update; automation-triggered update; delegated approval; waiver/deviation route; read-only external collaboration. |
 | Error / exception handling | Reject invalid transitions; record validation errors; support rollback where safe; create issue/NCR for controlled failures; preserve failed automation evidence. |
 | Related records | Graph node, Graph edge, Link type, Trace matrix, Impact analysis run; approvals; baselines; evidence; trace links; reports. |
@@ -469,6 +469,7 @@ Records must support applicability by project, product, release, customer, tenan
 | Governance profile | Description | Typical use |
 |---|---|---|
 | Lightweight | Minimal review and evidence. | Small internal project. |
+| Low-risk bulk | Automated rule-based approval for bulk, low-risk items (e.g. minor metadata updates) when all integrity checks pass; full audit trail maintained; escalates to Standard on any check failure. | Bulk metadata corrections, tag updates, minor field amendments. |
 | Standard | Normal review, approval, and evidence. | Typical product/project. |
 | Controlled | Formal baselines, approvals, evidence, audit. | Customer, regulated, or high-risk work. |
 | Critical | Strong separation of duties, independent assurance, strict gates. | Security/safety/business-critical systems. |
@@ -962,11 +963,12 @@ Implement as a shared internal service / platform substrate with APIs and projec
 
 ## 22.1 Source Coverage Checklist
 
-This specification covers the requested module scope: Relationship registry, Bidirectional linking, Impact analysis, Traceability matrices, Topology graph, Coverage analysis, Suspect link management, Historical graph snapshots.
+This specification covers the requested module scope: Relationship registry, Bidirectional linking, Impact analysis, Traceability matrices, Topology graph, Coverage analysis, Suspect link management, Historical graph snapshots, Historical Graph Explorer (point-in-time and named-baseline visual traversal).
 
 ## 22.2 Specialized Rules
 
 - Supported relationship types must be controlled and versioned.
-- Graph query model must support bounded traversal, matrix generation, topology views, and historical snapshots.
+- Graph query model must support bounded traversal, matrix generation, topology views, and historical snapshots; the Historical Graph Explorer must allow auditors to traverse the graph as it existed at any named baseline, release, deployment, or audit-period boundary without modifying live data.
 - Suspect link algorithm marks downstream links suspect when approved upstream records change.
 - Impact analysis must include records, evidence, releases, environments, customers, and controls.
+- Substrate correctness invariants for this component (INV-003 graph↔relational consistency; INV-006 permission-aware search consistency) are defined and gated by `SPMS-STD-INVARIANTS`.

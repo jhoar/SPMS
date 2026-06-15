@@ -73,3 +73,85 @@ validation approach run against the Standard profile by default, with a schedule
 soak test per release candidate for components on the critical path (graph traversal, search,
 evidence store, event bus). Targets that cannot be met at a profile are recorded as accepted
 risk with a remediation plan, never silently relaxed.
+
+# 5. Minimum Viable Governed Deployment
+
+The Small profile (§2) defines hardware and capacity constraints. This section defines the
+minimum **functional scope** for the smallest useful production deployment within that profile:
+one team, one project, with end-to-end governed record control.
+
+## 5.1 Required substrate components
+
+All of the following must be present and operational before the deployment is considered governed:
+
+| Component | Role |
+|---|---|
+| `SPMS-PLAT-CORE` | Tenant, project, identity, permissions, common record model |
+| `SPMS-WF-GOV` | Lifecycle, approvals, gates, waivers, SLA |
+| `SPMS-EVID-AUDIT` | Evidence registry, immutable audit log |
+| `SPMS-BASE-CCB` | Baselines, versioning, change control |
+| `SPMS-TRACE-GRAPH` | Relationship graph, coverage, suspect links |
+| `SPMS-INT-EVENT` | Event bus, outbox relay, domain-event contracts |
+| `SPMS-DATA-STORE` | Relational store, object storage, graph and search projections |
+
+## 5.2 Required functional modules
+
+The minimum governed deployment must include the following functional modules (or enough of each
+to satisfy the record types in §5.3):
+
+| Module | Minimum scope |
+|---|---|
+| `SPMS-ISS-CHG` | Issue/change record lifecycle |
+| `SPMS-DOC-KM` | Document record lifecycle |
+| `SPMS-REQ-MGMT` | Requirement record lifecycle |
+| `SPMS-TEST-VV` | Test case and verification record lifecycle |
+| `SPMS-REL-DEP` | Release record with evidence and baseline |
+
+## 5.3 Required record types
+
+The deployment must support creation, workflow, approval, evidence attachment, baselining,
+trace linking, and audit reconstruction for each of the following record types:
+
+- Controlled item (generic, used for thin governed thread validation)
+- Issue / change record
+- Document
+- Requirement
+- Test case / verification record
+- Evidence record
+- Baseline
+- Trace link
+- Release record
+- Audit event
+
+## 5.4 Required end-to-end capability
+
+The deployment must pass all 10 scenarios in the Thin Governed Thread Acceptance Suite
+(`SPMS-THINTHREAD`) end to end before it may be declared a governed production deployment.
+
+## 5.5 Optional components (may be deferred)
+
+The following components are not required for the minimum governed deployment and may be added
+incrementally:
+
+| Component | Typical phase |
+|---|---|
+| `SPMS-WP-PLAN` | Phase 6 |
+| `SPMS-CICD` | Phase 8 |
+| `SPMS-CFG-ASSET` | Phase 9 |
+| `SPMS-SEC-COMP` | Phase 10 |
+| `SPMS-PROD-ASSUR` | Phase 10 |
+| `SPMS-REPORT-ANALYTICS` | Phase 5/11 (basic export from DATA-STORE sufficient initially) |
+| `SPMS-AUTO-AI` | Phase 12 |
+
+## 5.6 Governance profile constraint
+
+The minimum deployment may operate at the **Lightweight** or **Low-risk bulk** governance profiles
+(SPMS-WF-GOV §8.1). The **Controlled** and **Critical** profiles require the full functional module
+set to be present before activation, as their gate and evidence requirements reference capabilities
+across all modules.
+
+The performance and resilience test levels in the phase implementation plan and the agile
+validation approach run against the Standard profile by default, with a scheduled Large-profile
+soak test per release candidate for components on the critical path (graph traversal, search,
+evidence store, event bus). Targets that cannot be met at a profile are recorded as accepted
+risk with a remediation plan, never silently relaxed.

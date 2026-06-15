@@ -592,6 +592,7 @@ Coverage expectations for this component:
 | Governance profile | Description | Typical use |
 |---|---|---|
 | Lightweight | Minimal review and evidence. | Small internal project |
+| Low-risk bulk | Automated rule-based approval for bulk, low-risk items (e.g. minor metadata updates) when all integrity checks pass; full audit trail maintained; escalates to Standard on any check failure. | Bulk metadata corrections, tag updates, minor field amendments. |
 | Standard | Normal review, approval, and evidence. | Typical product/project |
 | Controlled | Formal baselines, approvals, evidence, audit. | Customer, regulated, or high-risk work |
 | Critical | Strong separation of duties, independent assurance, strict gates. | Security/safety/business-critical systems |
@@ -1277,6 +1278,8 @@ Implement this component as part of a modular monolith with strict internal boun
 - The relational store is authoritative for records; graph/search/metrics are projections and must be rebuildable.
 - Object storage references must include retention class, classification, hash, owner, and related record IDs.
 - Rebuild procedures must be tested and documented for graph, search, vector, and metrics projections.
+- The transactional outbox pattern, projection consumption contract, and rebuild protocol for all derived stores are governed by `SPMS-STD-EVENT`.
+- Substrate correctness invariants for this component (INV-003 graph↔relational consistency; INV-005 import reconciliation correctness; INV-006 permission-aware search consistency; INV-007 event-projection convergence) are defined and gated by `SPMS-STD-INVARIANTS`.
 
 ## 22.1 Source Alignment Notes
 
