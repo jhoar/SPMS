@@ -14,7 +14,7 @@
 | Reviewers | SPMS Architecture Review Board |
 | Approvers | Engineering Director; Programme Technical Authority |
 | Date created | 2026-05-17 |
-| Last updated | 2026-06-14 |
+| Last updated | 2026-06-16 |
 | Authoritative | Yes |
 | Supersedes | SPMS-SUB-005 |
 | Specification register | SPMS-INDEX |
@@ -166,6 +166,8 @@ Evidence & Audit Core is a shared foundation service in the modular Software Pro
 | SPMS-EVID-AUDIT-CAP-006 | Retention and legal hold | Provides retention and legal hold for Evidence & Audit Core. | Should | Yes |
 | SPMS-EVID-AUDIT-CAP-007 | Historical reconstruction | Provides historical reconstruction for Evidence & Audit Core. | Should | Yes |
 | SPMS-EVID-AUDIT-CAP-008 | Export and audit packaging | Provides export and audit packaging for Evidence & Audit Core. | Should | Yes |
+| SPMS-EVID-AUDIT-CAP-009 | Evidence review and approval | Reviews and approves evidence for sufficiency before it is relied upon at gates. | Should | No |
+| SPMS-EVID-AUDIT-CAP-010 | Tamper-resistance checks | Verifies the audit hash chain and evidence integrity to detect tampering. | Should | Yes |
 
 ## 4.2 Capability Details
 
@@ -345,6 +347,50 @@ Evidence & Audit Core is a shared foundation service in the modular Software Pro
 | Metrics produced | Volume, throughput, cycle time, aging, backlog, readiness, evidence completeness, approval latency, exception count, and trend indicators. |
 | Configuration options | Field schema, workflow, roles, approval policy, retention, notifications, views, import mappings, and automation rules. |
 
+## Capability: `Evidence review and approval`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-EVID-AUDIT-CAP-009 |
+| Purpose | Review evidence for sufficiency, relevance, and integrity, and approve it before it is relied upon at gates, baselines, or acceptance. |
+| Trigger | Event-driven (on evidence added) / Manual / API |
+| Primary users | Reviewer; Approver; Owner; Auditor |
+| Inputs | Evidence items, their object references and hashes, the supported record, and review policy. |
+| Outputs | `EvidenceReview` records, sufficiency decisions, and audit events. |
+| Preconditions | Evidence exists and is linked to a record; reviewer holds evidence-review permission. |
+| Postconditions | Evidence carries a recorded review decision and sufficiency assessment. |
+| Main workflow | Inspect evidence and integrity hash; assess sufficiency against requirements; record decision; on rejection, require superseding evidence; emit audit/event records. |
+| Alternate workflows | Bulk review; delegated review; automation-assisted sufficiency check with human confirmation. |
+| Error / exception handling | Block reliance on unreviewed/rejected evidence at controlled gates; preserve review rationale. |
+| Related records | Evidence item, EvidenceReview, Evidence package; gates; approvals; trace links. |
+| Required evidence | Review records and sufficiency assessments. |
+| Required approvals | Reviewer/approver decision per governance profile. |
+| Audit requirements | Audit review decisions and any reliance on rejected/expired evidence. |
+| Metrics produced | Review coverage, rejection rate, and time-to-review. |
+| Configuration options | Review policy, sufficiency criteria, and gate-binding rules. |
+
+## Capability: `Tamper-resistance checks`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-EVID-AUDIT-CAP-010 |
+| Purpose | Verify the per-tenant audit hash chain and evidence content hashes to detect tampering or gaps. |
+| Trigger | Scheduled / On demand / Event-driven |
+| Primary users | Auditor; Administrator; Automation actor |
+| Inputs | Audit event chain, evidence content hashes, and object-store integrity metadata. |
+| Outputs | Verification results, tamper/gap findings, and audit events. |
+| Preconditions | Audit events and evidence exist. |
+| Postconditions | Chain and evidence integrity are verified and any anomaly is reported. |
+| Main workflow | Recompute and compare `prev_hash` across the audit chain; verify evidence content hashes against stored objects; report breaks/gaps; emit audit/event records. |
+| Alternate workflows | Spot-check verification; export of verification proof; automation alert on integrity failure. |
+| Error / exception handling | Raise a high-severity finding on any chain break or hash mismatch; never auto-repair; preserve the anomaly evidence. |
+| Related records | Audit event, AuditStream, Integrity hash, Evidence item. |
+| Required evidence | Verification run results and any anomaly findings. |
+| Required approvals | None to run; investigation outcomes follow governance. |
+| Audit requirements | Verification runs and findings are themselves audited. |
+| Metrics produced | Chain-verification status, anomaly count, and coverage of verified evidence. |
+| Configuration options | Verification cadence, scope, and alerting thresholds. |
+
 ---
 
 # 5. Lifecycle and State Model
@@ -393,9 +439,16 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | Object reference | Primary Evidence & Audit Core record for object reference management. | Yes |
 | Audit event | Primary Evidence & Audit Core record for audit event management. | Yes |
 | Retention policy | Primary Evidence & Audit Core record for retention policy management. | Yes |
+| EvidenceType | A registered category of evidence with its sufficiency and retention rules. | Yes |
+| AuditStream | The per-tenant ordered, append-only audit hash chain. | Yes |
+| EvidenceReview | A recorded review/sufficiency decision on an evidence item. | Yes |
+| ProvenanceRecord | Links evidence/artifacts to the producing job, pipeline, or automation. | Yes |
 | Integrity hash | Primary Evidence & Audit Core record for integrity hash management. | Shared |
 | Legal hold | Primary Evidence & Audit Core record for legal hold management. | Shared |
 | Audit export | Primary Evidence & Audit Core record for audit export management. | Shared |
+
+The `Evidence package` entity realises the canonical `EvidencePackage` schema
+(`SPMS-DOMAIN-MODEL` §7.4); each `Audit event` realises the canonical `AuditEvent` schema (§7.4).
 
 ## 6.2 Entity Attributes
 
@@ -413,6 +466,40 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
 | Updated at / by | DateTime + Actor | Yes | Last update metadata. | System generated. |
 | Tags / metadata | Map | No | Extensible module metadata. | Validated by metadata schema. |
+
+## Entity: `AuditStream`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | One active stream per tenant. |
+| Tenant | Reference | Yes | The tenant whose audit chain this stream holds. | Immutable. |
+| Head event | Reference | Yes | The most recent `Audit event` in the chain. | Advances only by append. |
+| Head hash | String | Yes | SHA-256 of the head event. | Used as `prev_hash` for the next append. |
+| Sealed segments | List | No | Periodically sealed/anchored chain segments. | Each segment records a seal hash and timestamp. |
+| Created at | DateTime | Yes | Stream creation. | Immutable. |
+
+## Entity: `EvidenceReview`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Evidence item | Reference | Yes | The reviewed evidence. | Must resolve to an evidence item. |
+| Evidence version | Integer | Yes | The version of the evidence reviewed. | Matches evidence at review time. |
+| Reviewer | User / Team / Role | Yes | Who reviewed. | Must resolve to active identity or role. |
+| Decision | Enum | Yes | Review outcome. | One of: sufficient, insufficient, rejected. |
+| Sufficiency assessment | String | Conditional | Why the evidence is/ isn't sufficient. | Required for insufficient/rejected. |
+| Decided at | DateTime | Yes | When reviewed. | System generated. |
+
+## Entity: `ProvenanceRecord`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Subject | Reference | Yes | The evidence/artifact whose provenance is recorded. | Must resolve to evidence/artifact. |
+| Produced by | Reference | Yes | The job, pipeline, or automation that produced the subject. | Realises `produced-by` (`SPMS-TRACE-GRAPH-REL-014`). |
+| Inputs | List of references | No | Inputs/sources consumed to produce the subject. | — |
+| Attestation ref | Reference | Conditional | Build/provenance attestation (e.g. SLSA). | Required for controlled supply-chain evidence. |
+| Recorded at | DateTime | Yes | When provenance was recorded. | System generated. |
 
 ## 6.3 Relationships
 
@@ -967,12 +1054,14 @@ Implement as a shared internal service / platform substrate with APIs and projec
 
 ## 22.1 Source Coverage Checklist
 
-This specification covers the requested module scope: Evidence registry, Object storage integration, Evidence metadata and integrity, Immutable audit history, Evidence packages, Retention and legal hold, Historical reconstruction, Export and audit packaging.
+This specification covers the requested module scope: Evidence registry, Object storage integration, Evidence metadata and integrity, Immutable audit history, Evidence packages, Retention and legal hold, Historical reconstruction, Export and audit packaging, Evidence review and approval, Tamper-resistance checks.
 
 ## 22.2 Specialized Rules
 
 - Evidence integrity uses hash, provenance, immutable object references, and review status.
-- Immutable storage rules must prevent silent rewriting of approved evidence and audit events.
+- The audit log is append-only: no UPDATE or DELETE is permitted. Each `Audit event` carries `prev_hash = SHA-256(previous AuditEvent)`, forming a per-tenant hash chain held by an `AuditStream`; chain verification recomputes and compares hashes head-to-tail, and segments may be periodically sealed/anchored. Each audit event records actor, action, target, before/after summary, source system, timestamp, and correlation id.
+- Immutable storage rules must prevent silent rewriting of approved evidence and audit events; evidence is immutable after acceptance and corrections are made by superseding evidence, never by in-place replacement.
+- Evidence packages are reproducible from stored member records and object references: an `Evidence package` composes evidence items (with object refs and content hashes), linked approvals, an audit-event slice, and baseline refs, and carries a `composition_hash` over its ordered members; only sealed packages are citable as audit evidence.
 - Evidence freshness rules mark evidence stale when linked requirements, code, configuration, environment, control, or release changes.
 - Audit package format must support ZIP plus manifest, hashes, metadata, and human-readable reports.
 - Substrate correctness invariants for this component (INV-001 audit append-only + hash chain; INV-002 historical reconstruction fidelity) are defined and gated by `SPMS-STD-INVARIANTS`.

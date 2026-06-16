@@ -14,7 +14,7 @@
 | Reviewers | SPMS Architecture Review Board |
 | Approvers | Engineering Director; Programme Technical Authority |
 | Date created | 2026-05-17 |
-| Last updated | 2026-06-14 |
+| Last updated | 2026-06-16 |
 | Authoritative | Yes |
 | Supersedes | SPMS-FUN-013; SPMS-SUB-010 (security portion) |
 | Specification register | SPMS-INDEX |
@@ -166,6 +166,11 @@ Security & Compliance Management is a functional module in the modular Software 
 | SPMS-SEC-COMP-CAP-006 | Supply-chain and SBOM controls | Provides supply-chain and sbom controls for Security & Compliance Management. | Should | No |
 | SPMS-SEC-COMP-CAP-007 | Privacy and data protection | Provides privacy and data protection for Security & Compliance Management. | Should | No |
 | SPMS-SEC-COMP-CAP-008 | Compliance assessment and audit | Provides compliance assessment and audit for Security & Compliance Management. | Should | No |
+| SPMS-SEC-COMP-CAP-009 | Vulnerability prioritization | Prioritizes vulnerabilities using CVSS, EPSS, exploit maturity, reachability, exposure, and asset criticality. | Must | Yes |
+| SPMS-SEC-COMP-CAP-010 | Vulnerability triage and lifecycle | Manages vulnerability state, ownership, SLA, and disposition through its lifecycle. | Must | Yes |
+| SPMS-SEC-COMP-CAP-011 | Policy and control exception management | Manages security/compliance exceptions with compensating controls and expiry. | Should | No |
+| SPMS-SEC-COMP-CAP-012 | Security hardening settings | Manages security configuration/hardening settings and their enforcement. | Should | No |
+| SPMS-SEC-COMP-CAP-013 | Security admin-action audit | Reviews and audits security-sensitive administrative actions. | Should | No |
 
 ## 4.2 Capability Details
 
@@ -345,6 +350,116 @@ Security & Compliance Management is a functional module in the modular Software 
 | Metrics produced | Volume, throughput, cycle time, aging, backlog, readiness, evidence completeness, approval latency, exception count, and trend indicators. |
 | Configuration options | Field schema, workflow, roles, approval policy, retention, notifications, views, import mappings, and automation rules. |
 
+## Capability: `Vulnerability prioritization`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-SEC-COMP-CAP-009 |
+| Purpose | Prioritize vulnerabilities using a combination of CVSS, EPSS, exploit maturity, reachability, exposure, asset criticality, business impact, and active-exploitation signals. |
+| Trigger | Event-driven / Scheduled / API / Integration |
+| Primary users | Administrator; Owner; Reviewer; Approver; Auditor; Automation actor |
+| Inputs | Vulnerability records, scanner findings (SARIF), threat intelligence, asset criticality, and exposure data. |
+| Outputs | Priority scores, SLA classes, ranked remediation queues, and audit events. |
+| Preconditions | Vulnerability records exist; asset and exposure context is available. |
+| Postconditions | Each vulnerability has a defensible, explainable priority and SLA class. |
+| Main workflow | Ingest/refresh signals; compute priority from the scoring model; assign SLA class from the SLA matrix; rank the remediation queue; emit audit/event records. |
+| Alternate workflows | Manual override with rationale; bulk re-scoring on signal change; automation-driven re-prioritization. |
+| Error / exception handling | Flag missing/stale signals; record override rationale; preserve scoring inputs for audit. |
+| Related records | Vulnerability, Finding, Threat, Control, Risk; assets; evidence; trace links. |
+| Required evidence | Scoring inputs, threat-intelligence references, and override rationale. |
+| Required approvals | Security authority approval for downgrades/overrides in controlled/critical profiles. |
+| Audit requirements | Audit scoring inputs, computed priority, SLA class, and manual overrides. |
+| Metrics produced | Priority distribution, SLA-at-risk count, override rate, and signal-completeness. |
+| Configuration options | Scoring model weights, SLA matrix, signal sources, and override policy. |
+
+## Capability: `Vulnerability triage and lifecycle`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-SEC-COMP-CAP-010 |
+| Purpose | Manage the state, ownership, SLA, and disposition of vulnerabilities from intake through closure. |
+| Trigger | Event-driven / Manual / API |
+| Primary users | Administrator; Owner; Contributor; Reviewer; Approver; Auditor; Automation actor |
+| Inputs | Prioritized vulnerabilities, ownership rules, remediation plans, and SLA policy. |
+| Outputs | Triage decisions, state transitions, assignments, dispositions, and audit events. |
+| Preconditions | Vulnerability exists and is prioritized; permissions allow triage. |
+| Postconditions | Vulnerability state, owner, SLA clock, and disposition are consistent and auditable. |
+| Main workflow | Triage (confirm/duplicate/false-positive/accept-risk); assign owner and SLA; track remediation; verify fix; close with evidence; emit audit/event records. |
+| Alternate workflows | Bulk triage; delegated triage; risk acceptance via exception (CAP-011); automation-assisted triage with human confirmation. |
+| Error / exception handling | Prevent closure without verification evidence; escalate SLA breaches; preserve triage rationale. |
+| Related records | Vulnerability, Finding, Exception, Control; remediation actions; evidence; trace links. |
+| Required evidence | Triage rationale, remediation evidence, and verification of fix. |
+| Required approvals | Risk-acceptance approval; security authority approval for critical closures. |
+| Audit requirements | Audit triage decisions, transitions, SLA events, and closures. |
+| Metrics produced | Triage latency, SLA compliance, reopen rate, and disposition mix. |
+| Configuration options | Triage workflow, SLA policy, ownership rules, and automation rules. |
+
+## Capability: `Policy and control exception management`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-SEC-COMP-CAP-011 |
+| Purpose | Manage time-bounded exceptions to security/compliance controls and policies, with compensating controls and explicit expiry. |
+| Trigger | Manual / API / Event-driven |
+| Primary users | Administrator; Owner; Reviewer; Approver; Auditor |
+| Inputs | Exception requests, affected controls/policies, risk assessment, and compensating controls. |
+| Outputs | Exception records, approval decisions, compensating-control links, and audit events. |
+| Preconditions | The affected control/policy exists; permissions allow exception requests. |
+| Postconditions | Exceptions are approved, time-bounded, evidenced, and tracked to closure. |
+| Main workflow | Raise exception with rationale and risk; define compensating controls; obtain approval per profile; set expiry; review/renew; close on remediation; emit audit/event records. |
+| Alternate workflows | Emergency exception with retrospective approval; delegated approval; automation-flagged expiring exceptions. |
+| Error / exception handling | Reject permanent exceptions unless explicitly approved; escalate expired/unrenewed exceptions; preserve rationale. |
+| Related records | Exception, Control, Security requirement, Risk; compensating controls; evidence; trace links. |
+| Required evidence | Risk assessment, compensating-control definition, and approval records. |
+| Required approvals | Owner plus security/governance authority based on profile. |
+| Audit requirements | Audit exception requests, approvals, renewals, and closures. |
+| Metrics produced | Open-exception count, expiring/overdue exceptions, and renewal rate. |
+| Configuration options | Exception policy, approval policy, expiry defaults, and review cadence. |
+
+## Capability: `Security hardening settings`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-SEC-COMP-CAP-012 |
+| Purpose | Manage security configuration and hardening settings (TLS/cipher policy, session and MFA policy, IP allowlists, secret-manager bindings) and their enforcement. |
+| Trigger | Manual / API / Scheduled |
+| Primary users | Administrator; Owner; Reviewer; Approver; Auditor |
+| Inputs | Security setting definitions, hardening baselines, and enforcement policy. |
+| Outputs | `SecuritySetting` records, enforcement results, drift findings, and audit events. |
+| Preconditions | Actor holds security-administration permission. |
+| Postconditions | Security settings are defined, enforced, evidenced, and auditable. |
+| Main workflow | Define hardening settings against a baseline; enforce; detect deviations; remediate or waive; emit audit/event records. |
+| Alternate workflows | Bulk apply baseline; API update; automation-detected hardening drift. |
+| Error / exception handling | Block weakening changes without approval; preserve prior settings for rollback; flag enforcement failures. |
+| Related records | SecuritySetting, Control, Exception; configuration items; evidence; trace links. |
+| Required evidence | Hardening baseline references, enforcement results, and approval for weakening changes. |
+| Required approvals | Security authority approval for changes that reduce hardening posture. |
+| Audit requirements | Audit all security-setting changes as access-sensitive actions. |
+| Metrics produced | Hardening-baseline conformance, deviation count, and unremediated drift. |
+| Configuration options | Hardening baselines, enforcement mode, and approval policy. |
+
+## Capability: `Security admin-action audit`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-SEC-COMP-CAP-013 |
+| Purpose | Review and audit security-sensitive administrative actions (permission changes, hardening changes, key/secret operations) for accountability. |
+| Trigger | Event-driven / Scheduled |
+| Primary users | Administrator; Auditor; Approver |
+| Inputs | Audit events for security-sensitive admin actions, review policy, and access-review schedules. |
+| Outputs | Review records, flagged anomalies, and audit-export evidence. |
+| Preconditions | Audit events exist; reviewer holds audit permission. |
+| Postconditions | Security-sensitive admin actions are reviewed, evidenced, and traceable. |
+| Main workflow | Collect security-sensitive admin events; review against policy; flag anomalies; record dispositions; emit audit/event records. |
+| Alternate workflows | Scheduled periodic review; ad-hoc investigation; automation-flagged anomaly review. |
+| Error / exception handling | Escalate unreviewed high-risk actions; preserve review rationale. |
+| Related records | Audit events; SecuritySetting; Permission changes; evidence; trace links. |
+| Required evidence | Review records and anomaly dispositions. |
+| Required approvals | Governance authority sign-off on review outcomes where configured. |
+| Audit requirements | All reviewed actions and their dispositions are themselves audited. |
+| Metrics produced | Review coverage, anomaly count, and time-to-review. |
+| Configuration options | Review scope, cadence, anomaly rules, and escalation policy. |
+
 ---
 
 # 5. Lifecycle and State Model
@@ -401,6 +516,9 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | Exception | Primary Security & Compliance Management record for exception management. | Shared |
 | Compliance assessment | Primary Security & Compliance Management record for compliance assessment management. | Shared |
 | Privacy record | Primary Security & Compliance Management record for privacy record management. | Shared |
+| ComplianceFramework | An external/internal control framework (e.g. ISO 27001, SOC 2, NIST, CIS, GDPR) that controls map to. | Yes |
+| Threat | A specific threat identified within a threat model (e.g. a STRIDE category instance). | Yes |
+| SecuritySetting | A security configuration/hardening setting and its enforcement state. | Yes |
 
 ## 6.2 Entity Attributes
 
@@ -415,9 +533,66 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | Project / product scope | Reference | Conditional | Owning project, product, tenant, or workspace. | Required unless global substrate object. |
 | Classification | Enum | Conditional | Data/security/business classification. | Must use platform classification taxonomy. |
 | Version | String / Integer | Yes | Current version or revision. | System managed for controlled records. |
+| Framework refs | List of references | Conditional | Compliance frameworks this control maps to. | Each must resolve to a registered `ComplianceFramework`. |
+| Control family | Enum | Conditional | Control family/category. | From configured control taxonomy. |
+| Implementation status | Enum | Yes | Implementation state of the control. | One of: not-implemented, partial, implemented, not-applicable. |
+| Test method | Enum | Conditional | How control effectiveness is assessed. | One of: inspection, interview, automated-test, observation. |
+| Last assessed | DateTime | Conditional | When the control was last assessed. | Drives reassessment scheduling. |
 | Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
 | Updated at / by | DateTime + Actor | Yes | Last update metadata. | System generated. |
 | Tags / metadata | Map | No | Extensible module metadata. | Validated by metadata schema. |
+
+## Entity: `Vulnerability`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Title | String | Yes | Human-readable summary. | — |
+| Status | Enum | Yes | Lifecycle/triage state. | Must match component state model. |
+| Owner | User / Team / Role | Yes | Accountable owner. | Must resolve to active identity or role. |
+| CVSS score | Decimal (0–10) | Conditional | Base/temporal CVSS score. | Required for scored vulnerabilities. |
+| EPSS score | Decimal (0–1) | Conditional | Exploit Prediction Scoring System probability. | 0.0–1.0. |
+| Exploit maturity | Enum | Conditional | Maturity of available exploits. | One of: none, poc, functional, weaponized. |
+| Reachability | Enum | Conditional | Whether the vulnerable code/path is reachable. | One of: reachable, unreachable, unknown. |
+| Exposure | Enum | Conditional | Network/exposure context. | One of: internal, external, isolated. |
+| Asset criticality | Enum | Conditional | Criticality of the affected asset. | From asset criticality taxonomy. |
+| Business impact | Enum | Conditional | Impact to business if exploited. | One of: low, medium, high, critical. |
+| Active exploitation | Boolean | Conditional | Whether active exploitation is observed in the wild. | Drives SLA escalation. |
+| SLA class | Enum | Yes | Remediation SLA class derived from the SLA matrix. | One of configured SLA classes. |
+| SARIF source ref | Reference | Conditional | Originating SARIF scan result. | Required for scanner-ingested findings. |
+| Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
+| Updated at / by | DateTime + Actor | Yes | Last update metadata. | System generated. |
+
+## Entity: `Threat model`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Name / title | String | Yes | Human-readable name. | Unique within scope. |
+| Status | Enum | Yes | Lifecycle state. | Must match component state model. |
+| Owner | User / Team / Role | Yes | Accountable owner. | Must resolve to active identity or role. |
+| Methodology | Enum | Yes | Threat-modelling methodology. | One of: STRIDE, PASTA, LINDDUN, attack-tree, custom. |
+| Trust boundaries | List | Conditional | Trust boundaries in scope. | — |
+| Assets in scope | List of references | Conditional | Assets/components covered by the model. | Each must resolve to a registered asset/component. |
+| Threats | List of references | Conditional | `Threat` records identified in this model. | Each must resolve to a registered `Threat`. |
+| Mitigations | List of references | Conditional | Controls mitigating identified threats. | Each must resolve to a registered `Control`. |
+| Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
+| Updated at / by | DateTime + Actor | Yes | Last update metadata. | System generated. |
+
+## Entity: `SecuritySetting`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Name / title | String | Yes | Human-readable setting name. | — |
+| Category | Enum | Yes | Hardening category. | One of: tls-cipher, session, mfa, ip-allowlist, secret-binding, other. |
+| Value | Structured | Yes | The configured setting value/policy. | Validated against the category schema. |
+| Hardening baseline ref | Reference | Conditional | Baseline this setting conforms to. | — |
+| Enforcement state | Enum | Yes | Whether the setting is enforced and compliant. | One of: enforced, deviation, unenforced. |
+| Secret refs | List of references | No | Secrets referenced by the setting. | References only; never raw secret values. |
+| Owner | User / Team / Role | Yes | Accountable owner. | Must resolve to active identity or role. |
+| Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
+| Updated at / by | DateTime + Actor | Yes | Last update metadata. | System generated. |
 
 ## 6.3 Relationships
 
@@ -972,13 +1147,15 @@ Implement as part of the modular monolith initially, with clear API boundaries a
 
 ## 22.1 Source Coverage Checklist
 
-This specification covers the requested module scope: Security governance and control library, Security and compliance requirements, Risk and threat modelling, Vulnerability intake and triage, Remediation and patch management, Supply-chain and SBOM controls, Privacy and data protection, Compliance assessment and audit.
+This specification covers the requested module scope: Security governance and control library, Security and compliance requirements, Risk and threat modelling, Vulnerability intake and triage, Remediation and patch management, Supply-chain and SBOM controls, Privacy and data protection, Compliance assessment and audit, Vulnerability prioritization, Vulnerability triage and lifecycle, Policy and control exception management, Security hardening settings, Security admin-action audit.
 
 ## 22.2 Specialized Rules
 
-- Vulnerability scoring should support CVSS, EPSS, exploit maturity, reachability, exposure, asset criticality, and business impact.
-- Control mappings should support internal controls and external frameworks such as ISO 27001, SOC 2, NIST, CIS, GDPR, and customer-specific obligations.
-- Vulnerability SLA matrix must vary by severity, exploitability, asset criticality, environment, and active exploitation.
+- Vulnerability scoring should support CVSS, EPSS, exploit maturity, reachability, exposure, asset criticality, and business impact, captured as concrete attributes on the `Vulnerability` entity and combined by the prioritization capability (CAP-009).
+- Control mappings should support internal controls and external frameworks such as ISO 27001, SOC 2, NIST, CIS, GDPR, and customer-specific obligations, modelled as `ComplianceFramework` records referenced from `Control.framework_refs`.
+- Threat models must record their methodology (e.g. STRIDE), trust boundaries, assets in scope, identified `Threat` records, and mitigating controls.
+- Vulnerability SLA matrix must vary by severity, exploitability, asset criticality, environment, and active exploitation, and resolves to the `Vulnerability.SLA class`.
 - Exception expiry rules must require review, renewal, compensating controls, and closure when fixed.
+- Security configuration/hardening settings are managed as `SecuritySetting` records; any change that reduces hardening posture requires security-authority approval, and all security-sensitive administrative actions are access-sensitive and always audited (extends §9.3).
 - Vulnerability Intake API must accept SARIF (Static Analysis Results Interchange Format v2.1.0) as a mandatory inbound format from all security scanner and CI/CD integrations; additional proprietary formats are permitted alongside SARIF.
 - Import and migration for this component must follow the shared pipeline defined in `SPMS-STD-MIG`.

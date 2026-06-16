@@ -14,7 +14,7 @@
 | Reviewers | SPMS Architecture Review Board |
 | Approvers | Engineering Director; Programme Technical Authority |
 | Date created | 2026-05-17 |
-| Last updated | 2026-06-14 |
+| Last updated | 2026-06-16 |
 | Authoritative | Yes |
 | Supersedes | SPMS-FUN-011 |
 | Specification register | SPMS-INDEX |
@@ -46,6 +46,8 @@ This component includes:
 - Release planning and scope.
 - Version registry.
 - Release baseline and readiness.
+- Release scope selection and change control (scope freeze, change requests against frozen scope).
+- Build and artifact linkage (release candidates, provenance, SBOM, signing, promotion records).
 - Deployment planning.
 - Deployment execution.
 - Rollback and recovery.
@@ -166,6 +168,8 @@ Release & Deployment Management is a functional module in the modular Software P
 | SPMS-REL-DEP-CAP-006 | Rollback and recovery | Provides rollback and recovery for Release & Deployment Management. | Should | No |
 | SPMS-REL-DEP-CAP-007 | Release governance and go/no-go | Provides release governance and go/no-go for Release & Deployment Management. | Should | No |
 | SPMS-REL-DEP-CAP-008 | Operational handover and post-deployment validation | Provides operational handover and post-deployment validation for Release & Deployment Management. | Should | No |
+| SPMS-REL-DEP-CAP-009 | Release scope and change control | Manages release scope items, scope freeze, and controlled change against frozen scope. | Must | Yes |
+| SPMS-REL-DEP-CAP-010 | Build and artifact linkage | Links release candidates to builds, artifacts, provenance, SBOMs, signatures, and promotion records. | Should | No |
 
 ## 4.2 Capability Details
 
@@ -345,6 +349,50 @@ Release & Deployment Management is a functional module in the modular Software P
 | Metrics produced | Volume, throughput, cycle time, aging, backlog, readiness, evidence completeness, approval latency, exception count, and trend indicators. |
 | Configuration options | Field schema, workflow, roles, approval policy, retention, notifications, views, import mappings, and automation rules. |
 
+## Capability: `Release scope and change control`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-REL-DEP-CAP-009 |
+| Purpose | Manage the set of scope items in a release, freeze scope at the appropriate gate, and control any change to frozen scope through a governed change route. |
+| Trigger | Manual / Event-driven / API / Integration / AI-assisted |
+| Primary users | Administrator; Owner; Contributor; Reviewer; Approver; Auditor; Automation actor |
+| Inputs | Candidate scope items (requirements, issues, changes, work packages), the target release, scope-freeze policy, change requests, and prior baselines. |
+| Outputs | Updated `ReleaseScopeItem` records, a frozen scope set, scope-change decisions, evidence links, audit events, and metrics. |
+| Preconditions | Actor is authenticated; permissions and workflow state allow the operation; the target release exists and is not yet closed. |
+| Postconditions | Scope membership, freeze state, change decisions, links, evidence, and audit history are consistent and queryable. |
+| Main workflow | Select candidate items into scope; validate against governance profile; freeze scope at the baseline/readiness gate; route any subsequent change as a controlled change request with impact analysis and approval; emit audit/event records. |
+| Alternate workflows | Bulk scope import; API update; automation-proposed scope; delegated approval; waiver/deviation for out-of-policy scope change; read-only external review. |
+| Error / exception handling | Reject scope changes to frozen scope without an approved change request; record validation errors; create issue/NCR for controlled failures; preserve rejected-change evidence. |
+| Related records | Release, Version, ReleaseScopeItem, Release baseline, Deployment plan; approvals; baselines; evidence; trace links; reports. |
+| Required evidence | Scope-freeze approval, change-request approvals, impact analysis, and prior baseline references. |
+| Required approvals | Product/owner approval to freeze scope; governance approval for any change to frozen scope in controlled/critical profiles. |
+| Audit requirements | Audit scope additions/removals, freeze events, change requests, approvals, and link changes. |
+| Metrics produced | Scope size, scope churn after freeze, change-request count and latency, and unapproved-change exceptions. |
+| Configuration options | Scope-freeze gate, change-control policy, approval policy, field schema, notifications, and automation rules. |
+
+## Capability: `Build and artifact linkage`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-REL-DEP-CAP-010 |
+| Purpose | Link a release and its versions to the builds, artifacts, provenance, SBOMs, signatures, and promotion records that realise them, so that what is released is verifiable and reproducible. |
+| Trigger | Event-driven / API / Integration / Scheduled |
+| Primary users | Administrator; Owner; Contributor; Reviewer; Approver; Auditor; Automation actor |
+| Inputs | Build and pipeline records (`SPMS-CICD`), artifact-repository references, SBOMs, signatures, attestations, and release-candidate definitions. |
+| Outputs | `produced-by` and `included-in` links between versions/releases and build artifacts, promotion records, provenance evidence, and audit events. |
+| Preconditions | Actor or automation is authenticated; the build/artifact exists in an authorised source; the version/release exists. |
+| Postconditions | Release/version-to-artifact provenance, signatures, and SBOM references are linked, evidenced, and queryable. |
+| Main workflow | Receive build/artifact completion; register the release candidate; link artifacts with provenance, SBOM, and signature references; record promotion across environments; emit audit/event records. |
+| Alternate workflows | Manual linkage; API update; re-linkage after re-build; delegated approval for promotion; read-only external review. |
+| Error / exception handling | Reject promotion of unsigned or SBOM-missing artifacts in controlled/critical profiles; record validation errors; preserve failed-promotion evidence. |
+| Related records | Release, Version, Release baseline, Deployment plan, Deployment run; build/artifact records; approvals; evidence; trace links. |
+| Required evidence | Provenance/attestation records, SBOMs, signatures, and promotion approval records. |
+| Required approvals | Promotion approval where configured; security approval for release candidates in controlled/critical profiles. |
+| Audit requirements | Audit artifact linkage, promotion, signature/SBOM verification results, and link changes. |
+| Metrics produced | Artifact-linkage completeness, SBOM/signature coverage, promotion latency, and provenance gaps. |
+| Configuration options | Artifact sources, provenance/SBOM/signature policy, promotion gates, approval policy, and automation rules. |
+
 ---
 
 # 5. Lifecycle and State Model
@@ -393,8 +441,9 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | Entity | Description | Owned by this component? |
 |---|---|---|
 | Release | Primary Release & Deployment Management record for release management. | Yes |
-| Version | Primary Release & Deployment Management record for version management. | Yes |
-| Release baseline | Primary Release & Deployment Management record for release baseline management. | Yes |
+| Version | Immutable, registered version/revision of a releasable item. | Yes |
+| ReleaseScopeItem | A single requirement/issue/change selected into a release's scope. | Yes |
+| Release baseline | Frozen, approved snapshot of a release's scope, versions, and evidence. | Yes |
 | Deployment plan | Primary Release & Deployment Management record for deployment plan management. | Yes |
 | Deployment run | Primary Release & Deployment Management record for deployment run management. | Yes |
 | Environment deployment | Primary Release & Deployment Management record for environment deployment management. | Shared |
@@ -418,6 +467,51 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | Updated at / by | DateTime + Actor | Yes | Last update metadata. | System generated. |
 | Tags / metadata | Map | No | Extensible module metadata. | Validated by metadata schema. |
 
+## Entity: `Version`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Version string | String | Yes | Human-readable version/revision (e.g. semantic version). | Unique per releasable item; immutable once registered. |
+| Releasable item | Reference | Yes | The product, component, or artifact this version belongs to. | Must resolve to a registered item. |
+| Status | Enum | Yes | Lifecycle state of the version. | Must match component state model. |
+| Owner | User / Team / Role | Yes | Accountable owner. | Must resolve to active identity or role. |
+| Artifact refs | List of references | Conditional | Build artifacts, packages, or containers that realise this version. | Required before promotion in controlled/critical profiles. |
+| Provenance ref | Reference | Conditional | Build/pipeline provenance and attestation. | Required where supply-chain controls apply. |
+| SBOM ref | Reference | Conditional | Software bill of materials for this version. | Required for controlled/critical release candidates. |
+| Signature ref | Reference | Conditional | Artifact signature / attestation. | Required for signed releases. |
+| Classification | Enum | Conditional | Data/security/business classification. | Must use platform classification taxonomy. |
+| Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
+| Updated at / by | DateTime + Actor | Yes | Last update metadata. | System generated. |
+
+## Entity: `ReleaseScopeItem`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Release | Reference | Yes | The release this scope item belongs to. | Must resolve to an open release. |
+| Scoped record | Reference | Yes | The requirement, issue, change, or work package in scope. | Must resolve to an eligible record. |
+| Scope status | Enum | Yes | One of: proposed, accepted, deferred, removed. | Transitions governed by scope-change control. |
+| Frozen | Boolean | Yes | Whether this item is part of frozen scope. | Cannot change once frozen except via approved change request. |
+| Change request ref | Reference | Conditional | The change request authorising a post-freeze change. | Required to alter a frozen scope item. |
+| Owner | User / Team / Role | Yes | Accountable owner. | Must resolve to active identity or role. |
+| Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
+| Updated at / by | DateTime + Actor | Yes | Last update metadata. | System generated. |
+
+## Entity: `Release baseline`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Name / title | String | Yes | Human-readable baseline name. | Unique within release. |
+| Release | Reference | Yes | The release this baseline freezes. | Must resolve to a release at the baseline gate. |
+| Members | List | Yes | Exact frozen versions of scope items, builds, artifacts, tests, docs, and evidence. | Immutable after seal; conforms to `SPMS-BASE-CCB` baseline schema. |
+| Status | Enum | Yes | One of: draft, sealed, superseded, archived. | Only sealed baselines support reconstruction. |
+| Approval refs | List of references | Conditional | Baseline approval records. | Required to seal in controlled/critical profiles. |
+| Evidence refs | List of references | Conditional | Evidence supporting the baseline. | Required where evidence is mandated. |
+| Sealed at / by | DateTime + Actor | Conditional | Seal metadata. | Immutable once set. |
+| Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
+
 ## 6.3 Relationships
 
 | Relationship | Source entity | Target entity | Cardinality | Required? | Description |
@@ -429,6 +523,8 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | included-in | Record | Baseline / Release / Work Package | N:N | Conditional | Scope, baseline, release, or package membership. |
 | verifies | Test / Evidence | Requirement | N:N | Conditional | Verification coverage. |
 | affects | Risk / Vulnerability / Change | Asset / Release / Requirement | N:N | Conditional | Impact and risk propagation. |
+| produced-by | Version / Artifact / Evidence | Build / Pipeline / Automation | N:N | Conditional | Provenance of release artifacts (`SPMS-TRACE-GRAPH-REL-014`). |
+| governed-by | Release / ReleaseScopeItem | Workflow / Policy / Gate | N:N | Conditional | Binds release and scope changes to the controlling process (`SPMS-TRACE-GRAPH-REL-016`). |
 
 ## 6.4 Applicability and Variants
 
@@ -971,11 +1067,14 @@ Implement as part of the modular monolith initially, with clear API boundaries a
 
 ## 22.1 Source Coverage Checklist
 
-This specification covers the requested module scope: Release planning and scope, Version registry, Release baseline and readiness, Deployment planning, Deployment execution, Rollback and recovery, Release governance and go/no-go, Operational handover and post-deployment validation.
+This specification covers the requested module scope: Release planning and scope, Version registry, Release baseline and readiness, Release scope and change control, Build and artifact linkage, Deployment planning, Deployment execution, Rollback and recovery, Release governance and go/no-go, Operational handover and post-deployment validation.
 
 ## 22.2 Specialized Rules
 
 - Release baseline must freeze exact requirements, issues, commits, builds, artifacts, configurations, tests, approvals, documents, and evidence.
+- Release scope must be explicitly selected as `ReleaseScopeItem` records and frozen at the baseline/readiness gate; once frozen, any addition, removal, or change requires an approved change request with impact analysis, and is governed (`governed-by`) by the change-control workflow.
+- Every release candidate must be linked (`produced-by`) to its builds and artifacts, with provenance, SBOM, and signature references; controlled/critical profiles must reject promotion of unsigned or SBOM-missing artifacts.
+- Promotion of a version across environments must be recorded as a promotion record with the approving authority and the verified provenance/signature state.
 - Deployment strategy must support blue/green, canary, rolling, phased, feature-flagged, ring-based, and emergency hotfix paths.
 - Rollback must define trigger criteria, previous version restoration, database/data strategy, validation, and post-rollback evidence.
 - Operational handover must include monitoring, runbooks, support readiness, known issues, and acceptance confirmation.

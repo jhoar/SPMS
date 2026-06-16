@@ -14,7 +14,7 @@
 | Reviewers | SPMS Architecture Review Board |
 | Approvers | Engineering Director; Programme Technical Authority |
 | Date created | 2026-05-17 |
-| Last updated | 2026-06-14 |
+| Last updated | 2026-06-16 |
 | Authoritative | Yes |
 | Supersedes | SPMS-SUB-001; SPMS-SUB-002 (record-model portion); SPMS-SUB-010 (admin/ops portion) |
 | Specification register | SPMS-INDEX |
@@ -166,6 +166,16 @@ Platform Core is a shared foundation service in the modular Software Project Man
 | SPMS-PLAT-CORE-CAP-006 | Notification and activity substrate | Provides notification and activity substrate for Platform Core. | Should | Yes |
 | SPMS-PLAT-CORE-CAP-007 | Administration console | Provides administration console for Platform Core. | Should | Yes |
 | SPMS-PLAT-CORE-CAP-008 | Platform operations and resilience | Provides platform operations and resilience for Platform Core. | Should | Yes |
+| SPMS-PLAT-CORE-CAP-009 | RBAC and ABAC authorization | Resolves effective authorization from role grants and attribute-based rules. | Must | Yes |
+| SPMS-PLAT-CORE-CAP-010 | Object and field-level permissions | Enforces per-object and per-field permission overrides. | Must | Yes |
+| SPMS-PLAT-CORE-CAP-011 | Approval authority and delegation | Manages who may approve and time-bounded delegation of authority. | Must | Yes |
+| SPMS-PLAT-CORE-CAP-012 | Separation of duties | Enforces incompatible-role and requester/approver constraints. | Should | Yes |
+| SPMS-PLAT-CORE-CAP-013 | Access review and evidence | Runs periodic access reviews and produces access evidence. | Should | No |
+| SPMS-PLAT-CORE-CAP-014 | Custom fields and validation | Defines custom fields and validation rules per record type. | Should | Yes |
+| SPMS-PLAT-CORE-CAP-015 | Record quality checks | Validates record completeness and quality against policy. | Should | No |
+| SPMS-PLAT-CORE-CAP-016 | Retention and legal-hold administration | Administers retention policies and legal holds across record types. | Should | Yes |
+| SPMS-PLAT-CORE-CAP-017 | Feature flag management | Manages platform/tenant feature flags. | Should | No |
+| SPMS-PLAT-CORE-CAP-018 | Observability and alerting | Provides health signals, metrics, and alerting for the platform. | Should | Yes |
 
 ## 4.2 Capability Details
 
@@ -345,6 +355,226 @@ Platform Core is a shared foundation service in the modular Software Project Man
 | Metrics produced | Volume, throughput, cycle time, aging, backlog, readiness, evidence completeness, approval latency, exception count, and trend indicators. |
 | Configuration options | Field schema, workflow, roles, approval policy, retention, notifications, views, import mappings, and automation rules. |
 
+## Capability: `RBAC and ABAC authorization`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-PLAT-CORE-CAP-009 |
+| Purpose | Resolve effective authorization for every request by combining role-based grants with attribute-based rules, applying a fixed permission-inheritance order. |
+| Trigger | API / Event-driven (every authorization decision) |
+| Primary users | All users (subject); Administrator (policy author); Auditor |
+| Inputs | Principal (user/team/role/service account), target record + attributes, role grants, and ABAC rules. |
+| Outputs | Allow/deny decisions, decision rationale, and audit events for sensitive decisions. |
+| Preconditions | Principal is authenticated; target and its classification/scope are resolvable. |
+| Postconditions | The decision is consistent with the inheritance order and ABAC attributes and is explainable. |
+| Main workflow | Resolve grants in order tenant → project/product → team → object → field/action override; evaluate ABAC attributes (classification clearance, membership, governance profile, lifecycle state); return the most-specific decision. |
+| Alternate workflows | Service-account authorization; delegated authority; external-collaborator restricted access. |
+| Error / exception handling | Deny by default on ambiguity; record denied sensitive access; preserve decision inputs for audit. |
+| Related records | User, Role, Permission, Group, ServiceAccount; records being accessed. |
+| Required evidence | Decision audit for access-sensitive operations. |
+| Required approvals | None for decisions; policy changes follow admin approval. |
+| Audit requirements | Audit permission changes and access-sensitive denials/grants. |
+| Metrics produced | Authorization latency, deny rate, and policy-conflict count. |
+| Configuration options | Role definitions, ABAC attribute set, and default-deny policy. |
+
+## Capability: `Object and field-level permissions`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-PLAT-CORE-CAP-010 |
+| Purpose | Enforce per-object and per-field permission overrides that may further restrict (never broaden) access granted at higher scopes. |
+| Trigger | API / Event-driven |
+| Primary users | Administrator; Owner; Auditor |
+| Inputs | Object/field override rules, record type field definitions, and the resolved higher-scope decision. |
+| Outputs | Field-filtered records and per-field allow/deny decisions. |
+| Preconditions | A higher-scope decision exists; field definitions are registered. |
+| Postconditions | Restricted fields are hidden/blocked even when the record is otherwise readable. |
+| Main workflow | Apply object-level override; apply field-level override; return the intersection (most restrictive) result. |
+| Alternate workflows | Bulk field-policy application; API field projection; export with field redaction. |
+| Error / exception handling | Default to most restrictive on conflict; never allow an override to broaden access; audit field-policy changes. |
+| Related records | FieldDefinition, RecordType, Permission; records being accessed. |
+| Required evidence | Audit of field-policy changes. |
+| Required approvals | Administrator approval for field-policy changes. |
+| Audit requirements | Audit object/field override changes. |
+| Metrics produced | Field-restriction coverage and override-conflict count. |
+| Configuration options | Object/field override rules and redaction behaviour. |
+
+## Capability: `Approval authority and delegation`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-PLAT-CORE-CAP-011 |
+| Purpose | Manage which identities hold approval authority and support time-bounded, scoped delegation of that authority (the identity side; the approval workflow itself is owned by `SPMS-WF-GOV`). |
+| Trigger | Manual / API / Event-driven |
+| Primary users | Administrator; Owner; Approver; Auditor |
+| Inputs | Authority assignments, delegation requests, scope, and expiry. |
+| Outputs | `Delegation` records, effective-authority resolution, and audit events. |
+| Preconditions | The delegating principal holds the authority; the delegate is an eligible identity. |
+| Postconditions | Delegated authority is time-bounded, scoped, visible in approval records, and never erases the original authority. |
+| Main workflow | Create delegation with scope and expiry; resolve effective authority at approval time; expire/revoke; emit audit/event records. |
+| Alternate workflows | Emergency delegation; automation-flagged expiring delegation. |
+| Error / exception handling | Reject delegation exceeding the delegator's authority or violating SoD; preserve delegation evidence. |
+| Related records | Delegation, User, Role; approval records (`SPMS-WF-GOV`). |
+| Required evidence | Delegation records and their scope/expiry. |
+| Required approvals | Administrator approval for standing delegations where configured. |
+| Audit requirements | Audit delegation creation, use, and revocation. |
+| Metrics produced | Active-delegation count and expired-but-used attempts. |
+| Configuration options | Delegation policy, default expiry, and SoD compatibility rules. |
+
+## Capability: `Separation of duties`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-PLAT-CORE-CAP-012 |
+| Purpose | Enforce incompatible-role and requester/approver constraints on the identity side so conflicting authorities are not combined. |
+| Trigger | API / Event-driven |
+| Primary users | Administrator; Approver; Auditor |
+| Inputs | SoD rule set, principal's roles/grants, and the action being attempted. |
+| Outputs | SoD allow/deny decisions and conflict findings. |
+| Preconditions | SoD rules are configured; principal roles are resolvable. |
+| Postconditions | Conflicting authorities are blocked or flagged per policy. |
+| Main workflow | Evaluate the attempted action against SoD rules; block requester==approver and incompatible-role combinations; record conflicts. |
+| Alternate workflows | Toxic-combination report; periodic SoD review; waiver-backed exception (`SPMS-WF-GOV`). |
+| Error / exception handling | Default to deny on conflict; require waiver for exceptions; audit conflicts. |
+| Related records | Role, Permission, User; AccessReview. |
+| Required evidence | SoD conflict findings and any waivers. |
+| Required approvals | Governance approval for SoD exceptions. |
+| Audit requirements | Audit SoD denials and exceptions. |
+| Metrics produced | SoD conflict count and exception rate. |
+| Configuration options | SoD rule set and exception policy. |
+
+## Capability: `Access review and evidence`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-PLAT-CORE-CAP-013 |
+| Purpose | Run periodic access reviews (recertification) and produce access evidence for audit. |
+| Trigger | Scheduled / On demand |
+| Primary users | Administrator; Owner; Reviewer; Auditor |
+| Inputs | Current grants, review scope/schedule, and reviewers. |
+| Outputs | `AccessReview` records, recertification decisions, revocations, and evidence. |
+| Preconditions | Grants exist; reviewers are assigned. |
+| Postconditions | Access is recertified or revoked, with evidence retained. |
+| Main workflow | Generate review campaign; reviewers certify/revoke each grant; apply revocations; emit audit/event records. |
+| Alternate workflows | Ad-hoc review; automation-driven anomaly review. |
+| Error / exception handling | Escalate unreviewed grants; auto-revoke per policy on timeout; preserve review evidence. |
+| Related records | AccessReview, Permission, User, Role. |
+| Required evidence | Review decisions and revocation records. |
+| Required approvals | Owner/administrator certification per scope. |
+| Audit requirements | Audit review campaigns and outcomes. |
+| Metrics produced | Review coverage, revocation rate, and overdue reviews. |
+| Configuration options | Review cadence, scope, and auto-revocation policy. |
+
+## Capability: `Custom fields and validation`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-PLAT-CORE-CAP-014 |
+| Purpose | Define custom fields and validation rules per record type within the common record model. |
+| Trigger | Manual / API |
+| Primary users | Administrator; Owner |
+| Inputs | Record type, field definitions, and validation rules. |
+| Outputs | `FieldDefinition` records and validated record metadata. |
+| Preconditions | The record type exists; actor holds schema-admin permission. |
+| Postconditions | Records of the type validate against the defined fields. |
+| Main workflow | Define field (type, required, constraints, classification); attach validation; version the schema; emit audit/event records. |
+| Alternate workflows | Import field schema; API update; deprecate field. |
+| Error / exception handling | Reject schema changes that invalidate existing records without migration; preserve schema versions. |
+| Related records | RecordType, FieldDefinition, Metadata schema. |
+| Required evidence | Schema version history. |
+| Required approvals | Administrator approval for controlled schema changes. |
+| Audit requirements | Audit schema changes. |
+| Metrics produced | Schema change frequency and validation-failure rate. |
+| Configuration options | Field types, validation library, and schema-versioning policy. |
+
+## Capability: `Record quality checks`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-PLAT-CORE-CAP-015 |
+| Purpose | Validate record completeness and quality against policy (required fields, classification set, ownership, links). |
+| Trigger | Event-driven / Scheduled |
+| Primary users | Owner; Reviewer; Administrator; Automation actor |
+| Inputs | Records, quality rules, and record type schemas. |
+| Outputs | Quality findings, completeness scores, and remediation tasks. |
+| Preconditions | Quality rules are configured. |
+| Postconditions | Quality gaps are surfaced and actionable. |
+| Main workflow | Evaluate records against quality rules; score completeness; flag gaps; emit audit/event records. |
+| Alternate workflows | Bulk quality scan; pre-gate quality check; automation-driven remediation suggestion. |
+| Error / exception handling | Flag rather than block by default; preserve rule provenance. |
+| Related records | RecordType, FieldDefinition; records being checked. |
+| Required evidence | Quality findings and scores. |
+| Required approvals | None. |
+| Audit requirements | Audit quality-rule changes. |
+| Metrics produced | Completeness score, gap count, and stale/unowned record count. |
+| Configuration options | Quality rule set and scoring weights. |
+
+## Capability: `Retention and legal-hold administration`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-PLAT-CORE-CAP-016 |
+| Purpose | Administer retention policies and legal holds across record types from the platform admin surface (retention/hold enforcement on evidence/audit is owned by `SPMS-EVID-AUDIT`; this is the admin/config slice). |
+| Trigger | Manual / Scheduled / API |
+| Primary users | Administrator; Compliance owner; Auditor |
+| Inputs | Retention policy definitions, legal-hold orders, classification, and record types. |
+| Outputs | Retention/hold configuration, scheduled retention actions, and audit events. |
+| Preconditions | Actor holds retention-admin permission. |
+| Postconditions | Retention and holds are configured and respected before any deletion/anonymization. |
+| Main workflow | Define retention by record type/classification; apply/lift legal holds; schedule retention actions that always honour legal hold and classification; emit audit/event records. |
+| Alternate workflows | Bulk policy application; API update; hold from external e-discovery. |
+| Error / exception handling | Block deletion under legal hold; require approval for permanent deletion; preserve retention-decision evidence. |
+| Related records | RetentionPolicy (`SPMS-EVID-AUDIT`), Legal hold; record types. |
+| Required evidence | Retention/hold configuration and action logs. |
+| Required approvals | Compliance approval for retention/hold changes. |
+| Audit requirements | Audit retention/hold configuration and enforcement. |
+| Metrics produced | Records under hold, pending retention actions, and policy coverage. |
+| Configuration options | Retention schedules, hold sources, and deletion-approval policy. |
+
+## Capability: `Feature flag management`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-PLAT-CORE-CAP-017 |
+| Purpose | Manage platform and tenant feature flags that enable/disable capabilities safely. |
+| Trigger | Manual / API |
+| Primary users | Administrator |
+| Inputs | Feature flag definitions, scope (platform/tenant), and default values. |
+| Outputs | `FeatureFlag` records and effective flag resolution. |
+| Preconditions | Actor holds platform/tenant admin permission. |
+| Postconditions | Flags are resolvable per scope and changes are audited. |
+| Main workflow | Define flag; set scope/default; override per tenant; resolve effective value; emit audit/event records. |
+| Alternate workflows | Gradual rollout; emergency disable; API update. |
+| Error / exception handling | Validate flag dependencies; preserve prior values for rollback. |
+| Related records | FeatureFlag, SystemSetting, TenantSetting. |
+| Required evidence | Flag change history. |
+| Required approvals | Administrator approval for production flag changes. |
+| Audit requirements | Audit flag changes. |
+| Metrics produced | Flag count, override count, and change frequency. |
+| Configuration options | Flag scopes, defaults, and rollout strategy. |
+
+## Capability: `Observability and alerting`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-PLAT-CORE-CAP-018 |
+| Purpose | Provide platform health signals, metrics, and alerting (job/queue monitoring, system health) for operations. |
+| Trigger | Scheduled / Event-driven |
+| Primary users | Administrator; Operator; Auditor; Automation actor |
+| Inputs | Health checks, metrics, job/queue state, and alert rules. |
+| Outputs | `HealthCheck` and `ObservabilitySignal` records, alerts, and dashboards. |
+| Preconditions | Signals are configured. |
+| Postconditions | Platform health is observable and alertable. |
+| Main workflow | Collect health/metric signals; evaluate alert rules; raise alerts; surface dashboards; emit audit/event records. |
+| Alternate workflows | Synthetic checks; on-demand health report; automation-driven remediation. |
+| Error / exception handling | Escalate on signal loss; preserve signal provenance. |
+| Related records | HealthCheck, ObservabilitySignal, AdminJob. |
+| Required evidence | Signal and alert history. |
+| Required approvals | None. |
+| Audit requirements | Audit alert-rule changes. |
+| Metrics produced | Signal coverage, alert volume, and mean-time-to-detect. |
+| Configuration options | Signal sources, alert rules, and dashboards. |
+
 ---
 
 # 5. Lifecycle and State Model
@@ -399,9 +629,29 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | User | Primary Platform Core record for user management. | Yes |
 | Role | Primary Platform Core record for role management. | Yes |
 | Permission | Primary Platform Core record for permission management. | Shared |
+| Group | A named collection of users for grant assignment. | Yes |
+| ServiceAccount | A non-human automation identity with scoped, expiring authority. | Yes |
+| Delegation | A time-bounded, scoped delegation of authority between identities. | Yes |
+| AccessReview | A recertification campaign over access grants. | Yes |
+| RecordType | A component-defined record type within the common record model. | Yes |
+| FieldDefinition | A custom field definition and its validation rules for a record type. | Yes |
+| ClassificationLabel | A classification label governing access, export, retention, and AI retrieval. | Yes |
+| LifecycleState | A configured lifecycle state mapped to the canonical state set. | Yes |
+| SystemSetting | A platform-scoped administrative setting. | Yes |
+| TenantSetting | A tenant-scoped administrative setting. | Yes |
+| FeatureFlag | A platform/tenant feature flag. | Yes |
+| HealthCheck | A platform health probe and its latest result. | Yes |
+| ObservabilitySignal | A metric/log/trace signal used for monitoring and alerting. | Yes |
+| AdminJob | A background/administrative job with monitored state. | Yes |
 | Metadata schema | Primary Platform Core record for metadata schema management. | Shared |
 | Taxonomy | Primary Platform Core record for taxonomy management. | Shared |
 | Workspace | Primary Platform Core record for workspace management. | Shared |
+
+The concrete `User`, `Role`, and `Permission` schemas are defined in `SPMS-DOMAIN-MODEL` §7.2 and
+referenced here; the management entities above (RecordType, FieldDefinition, ClassificationLabel,
+LifecycleState, and the admin/observability entities) are Platform Core's owned configuration
+entities. `RetentionPolicy` and `LegalHold` are owned by `SPMS-EVID-AUDIT` and referenced, not
+redefined, here.
 
 ## 6.2 Entity Attributes
 
@@ -419,6 +669,57 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
 | Updated at / by | DateTime + Actor | Yes | Last update metadata. | System generated. |
 | Tags / metadata | Map | No | Extensible module metadata. | Validated by metadata schema. |
+
+## Entity: `ServiceAccount`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Name | String | Yes | Human-readable name. | Unique within tenant. |
+| Owner | User / Team / Role | Yes | Accountable human owner. | Must resolve to active identity. |
+| Purpose | String | Yes | Why the account exists. | — |
+| Scope | List of references | Yes | The components/projects/actions the account may perform. | Least-privilege; validated on use. |
+| Expiry | DateTime | Yes | When the account/credential expires. | Must be set; renewal required. |
+| Secret refs | List of references | No | Credentials referenced by the account. | References only; never raw secret values. |
+| Status | Enum | Yes | One of: active, suspended, expired, revoked. | — |
+| Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
+
+## Entity: `Delegation`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Delegator | Reference | Yes | The identity delegating authority. | Must hold the delegated authority. |
+| Delegate | Reference | Yes | The identity receiving authority. | Must be an eligible identity. |
+| Scope | List of references | Yes | The authority/actions delegated. | Cannot exceed the delegator's authority. |
+| Starts at / Expires at | DateTime | Yes | Validity window. | Time-bounded; expiry required. |
+| Status | Enum | Yes | One of: active, expired, revoked. | — |
+| Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
+
+## Entity: `FieldDefinition`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Record type | Reference | Yes | The record type this field belongs to. | Must resolve to a registered `RecordType`. |
+| Name / key | String | Yes | Field key. | Unique within the record type. |
+| Data type | Enum | Yes | Field data type. | One of: string, number, boolean, date, enum, reference, list. |
+| Required | Boolean | Yes | Whether the field is mandatory. | — |
+| Constraints | Structured | No | Validation constraints (range, pattern, enum values). | Validated on record write. |
+| Classification | Enum | Conditional | Field-level classification for field security. | Must use platform classification taxonomy. |
+| Schema version | Integer | Yes | Version of the field schema. | Incremented on controlled change. |
+
+## Entity: `FeatureFlag`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Key | String | Yes | Flag key. | Unique within scope. |
+| Scope | Enum | Yes | One of: platform, tenant. | — |
+| Default value | Boolean / Enum | Yes | Default flag value. | — |
+| Tenant overrides | Map | No | Per-tenant override values. | Only for platform-scope flags. |
+| Status | Enum | Yes | One of: active, deprecated. | — |
+| Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
 
 ## 6.3 Relationships
 
@@ -728,6 +1029,28 @@ The component must support reconstruction of state at a specific date/time, name
 | Change permissions | Administrator or delegated permission manager. |
 | Configure workflow | Component administrator and governance authority. |
 
+### 13.1.1 RBAC, ABAC, and Field-Level Rules
+
+Effective authorization (CAP-009/010) is resolved by combining role grants with attribute-based
+rules, applying a fixed inheritance order from most general to most specific, where the most
+specific applicable rule wins:
+
+`tenant → project/product → team → object (record) → field/action override`
+
+- **RBAC:** grants are assigned to users, teams, groups, roles, or service accounts at a scope
+  (tenant/project/component).
+- **ABAC:** when a role grant alone is insufficient, the decision evaluates attributes — the
+  principal's `classification_clearance` vs the target `classification`, project/team membership,
+  the record/project `governance_profile`, and the record `lifecycle_state` (e.g. baselined records
+  are read-only outside a change request).
+- **Object- and field-level overrides** may further **restrict** (never broaden) access; a
+  field-level override can hide or block individual fields even when the record is otherwise
+  readable. Conflicts resolve to the most restrictive outcome; ambiguity defaults to deny.
+- **Service accounts** must have an owner, purpose, least-privilege scope, expiry, and a full audit
+  trail. **Delegated authority** is time-bounded, scoped, visible in approval records, and never
+  erases the original authority. Detailed security architecture and ABAC/RBAC evaluation are
+  governed by `SPMS-STD-SEC`; the canonical authorization model is in `SPMS-DOMAIN-MODEL` §7.2.
+
 ## 13.2 Data Classification
 
 Supported classifications: Public, Internal, Confidential, Restricted, Customer-confidential, Security-sensitive, Personal data, Regulated data, Export-controlled.
@@ -973,13 +1296,16 @@ Implement as a shared internal service / platform substrate with APIs and projec
 
 ## 22.1 Source Coverage Checklist
 
-This specification covers the requested module scope: Tenant and workspace management, Project/product/team registry, Identity and access management, Metadata and taxonomy management, Common object model, Notification and activity substrate, Administration console, Platform operations and resilience.
+This specification covers the requested module scope: Tenant and workspace management, Project/product/team registry, Identity and access management, Metadata and taxonomy management, Common object model, Notification and activity substrate, Administration console, Platform operations and resilience, RBAC and ABAC authorization, Object and field-level permissions, Approval authority and delegation, Separation of duties, Access review and evidence, Custom fields and validation, Record quality checks, Retention and legal-hold administration, Feature flag management, Observability and alerting.
 
 ## 22.2 Specialized Rules
 
 - Tenant isolation and project/product/team hierarchy are mandatory foundations.
 - Identity must support SSO/OIDC/SAML/LDAP, local identities where configured, groups, service accounts, and external collaborators.
-- Permission model must support RBAC, ABAC, object-level rules, field restrictions, and classification-aware access.
+- Permission model must support RBAC, ABAC, object-level rules, field restrictions, and classification-aware access, resolved in the fixed inheritance order tenant → project/product → team → object → field/action override (see §13.1.1); the most specific applicable rule wins and ambiguity defaults to deny.
+- Service accounts must have an owner, purpose, least-privilege scope, and expiry; delegated authority is time-bounded, scoped, and never erases the original authority.
+- Record identifiers are immutable and independent of title, location, and hierarchy; classification labels drive permissions, export, retention, AI retrieval, and external sharing; the common lifecycle allows module-specific states without breaking cross-module reporting.
 - Metadata schema and taxonomy services must be common across modules for consistent reporting and search.
+- Administrative and security-sensitive actions are always audited; retention actions must respect legal hold and classification before any deletion or anonymization (retention/hold enforcement on evidence and audit is owned by `SPMS-EVID-AUDIT`).
 - Security architecture, tenant isolation model, ABAC/RBAC evaluation order, field-level security, service identity, secret-reference handling, audit log tamper resistance, export-control enforcement, and AI retrieval permission boundaries are governed by `SPMS-STD-SEC`.
 - Configuration governance — the taxonomy of fixed, canonical-constrained, and free configuration surfaces, consistency guardrails, and tenant divergence prevention — is governed by `SPMS-STD-CONFIG`.
