@@ -14,7 +14,7 @@
 | Reviewers | SPMS Architecture Review Board |
 | Approvers | Engineering Director; Programme Technical Authority |
 | Date created | 2026-05-17 |
-| Last updated | 2026-06-14 |
+| Last updated | 2026-06-16 |
 | Authoritative | Yes |
 | Supersedes | SPMS-FUN-012 |
 | Specification register | SPMS-INDEX |
@@ -166,6 +166,8 @@ Configuration & Asset Management is a functional module in the modular Software 
 | SPMS-CFG-ASSET-CAP-006 | Discovery and synchronization | Provides discovery and synchronization for Configuration & Asset Management. | Should | No |
 | SPMS-CFG-ASSET-CAP-007 | Drift detection and reconciliation | Provides drift detection and reconciliation for Configuration & Asset Management. | Should | No |
 | SPMS-CFG-ASSET-CAP-008 | Dependency and impact management | Provides dependency and impact management for Configuration & Asset Management. | Should | No |
+| SPMS-CFG-ASSET-CAP-009 | Configuration versioning | Maintains a version history of configuration items and their configuration values. | Should | No |
+| SPMS-CFG-ASSET-CAP-010 | Configuration change control | Routes changes to controlled configuration items and baselines through governed approval. | Must | Yes |
 
 ## 4.2 Capability Details
 
@@ -345,6 +347,50 @@ Configuration & Asset Management is a functional module in the modular Software 
 | Metrics produced | Volume, throughput, cycle time, aging, backlog, readiness, evidence completeness, approval latency, exception count, and trend indicators. |
 | Configuration options | Field schema, workflow, roles, approval policy, retention, notifications, views, import mappings, and automation rules. |
 
+## Capability: `Configuration versioning`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-CFG-ASSET-CAP-009 |
+| Purpose | Maintain an immutable version history of configuration items and their declared configuration values so that any past state can be reconstructed and compared. |
+| Trigger | Event-driven / API / Scheduled |
+| Primary users | Administrator; Owner; Contributor; Auditor; Automation actor |
+| Inputs | Configuration item changes, declared configuration values, discovery snapshots, and baselines. |
+| Outputs | Version snapshots, change summaries, diff records, and audit events. |
+| Preconditions | Actor or automation is authenticated; the configuration item exists. |
+| Postconditions | Each controlled change yields a new immutable version; prior versions remain queryable. |
+| Main workflow | Detect or receive a configuration change; capture a version snapshot of the declared state; record change summary and actor; emit audit/event records. |
+| Alternate workflows | Bulk version capture on import; API update; automation-captured discovery snapshot. |
+| Error / exception handling | Reject version capture for non-existent items; preserve partial-capture evidence; flag snapshot integrity failures. |
+| Related records | Configuration item, Configuration baseline, Drift record, Discovery source; evidence; audit events. |
+| Required evidence | Version snapshots and change summaries; discovery snapshot references where applicable. |
+| Required approvals | None for capture; controlled value changes follow change control (CAP-010). |
+| Audit requirements | Audit each version capture with actor, source, and change summary. |
+| Metrics produced | Version count, change frequency, configuration churn, and snapshot integrity status. |
+| Configuration options | Snapshot policy, retention of versions, diff granularity, and automation rules. |
+
+## Capability: `Configuration change control`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-CFG-ASSET-CAP-010 |
+| Purpose | Route changes to controlled configuration items and configuration baselines through governed review, impact analysis, and approval. |
+| Trigger | Manual / Event-driven / API / Integration |
+| Primary users | Administrator; Owner; Contributor; Reviewer; Approver; Auditor; Automation actor |
+| Inputs | Proposed configuration changes, affected items and baselines, dependency/impact analysis, and change-control policy. |
+| Outputs | Change requests, approval decisions, updated configuration items/baselines, evidence links, and audit events. |
+| Preconditions | Actor is authenticated; the target item/baseline is under configuration control; permissions allow the change. |
+| Postconditions | Controlled configuration changes are approved, evidenced, versioned, and auditable. |
+| Main workflow | Raise a configuration change request; run dependency/impact analysis; obtain approval per governance profile; apply the change; capture a new version; emit audit/event records. |
+| Alternate workflows | Emergency change with retrospective approval; delegated approval; waiver/deviation route; automation-proposed change requiring human approval. |
+| Error / exception handling | Reject uncontrolled edits to baselined items; record validation errors; create issue/NCR for controlled failures; preserve rejected-change evidence. |
+| Related records | Configuration item, Configuration baseline, Dependency, Drift record; change requests; approvals; evidence; trace links. |
+| Required evidence | Impact analysis, approval records, and post-change verification. |
+| Required approvals | Owner approval; governance approval for baselined/controlled items in controlled/critical profiles. |
+| Audit requirements | Audit change requests, impact analysis, approvals, and applied changes. |
+| Metrics produced | Change-request volume and latency, emergency-change rate, and unapproved-change exceptions. |
+| Configuration options | Change-control policy, approval policy, impact-analysis scope, and automation rules. |
+
 ---
 
 # 5. Lifecycle and State Model
@@ -397,6 +443,9 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | Environment | Primary Configuration & Asset Management record for environment management. | Yes |
 | Topology node | Primary Configuration & Asset Management record for topology node management. | Yes |
 | Configuration baseline | Primary Configuration & Asset Management record for configuration baseline management. | Yes |
+| Service | A logical service realised by one or more configuration items. | Yes |
+| Interface | A defined interface/endpoint exposed or consumed by a configuration item or service. | Yes |
+| Dependency | A typed dependency between configuration items, services, or interfaces. | Yes |
 | Discovery source | Primary Configuration & Asset Management record for discovery source management. | Shared |
 | Drift record | Primary Configuration & Asset Management record for drift record management. | Shared |
 | Installation record | Primary Configuration & Asset Management record for installation record management. | Shared |
@@ -414,9 +463,62 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | Project / product scope | Reference | Conditional | Owning project, product, tenant, or workspace. | Required unless global substrate object. |
 | Classification | Enum | Conditional | Data/security/business classification. | Must use platform classification taxonomy. |
 | Version | String / Integer | Yes | Current version or revision. | System managed for controlled records. |
+| CI type | Enum | Yes | Configuration item type (e.g. server, service, database, network, application, container). | From configured CI type taxonomy. |
+| Criticality | Enum | Conditional | Business/operational criticality. | One of: low, medium, high, critical; required for production CIs. |
+| Environment | Reference | Conditional | Environment this CI belongs to. | Must resolve to a registered Environment. |
+| Service mapping | List of references | Conditional | Services this CI realises or supports. | Each must resolve to a registered Service. |
+| Lifecycle owner | User / Team / Role | Conditional | Party accountable for the CI's operational lifecycle. | Must resolve to active identity or role. |
+| Data classification | Enum | Conditional | Classification of data handled by the CI. | Must use platform classification taxonomy. |
+| Declared vs discovered state | Enum | Conditional | Reconciliation status of declared against discovered state. | One of: matched, drift, undiscovered, undeclared. |
+| Source-of-truth confidence | Decimal (0–1) | Conditional | Confidence in the CI record as source of truth. | 0.0–1.0; lower for unreconciled/discovered-only CIs. |
+| Secret refs | List of references | No | References to secrets used by the CI. | References only (`secret:<provider>:<name>:<version>`); never raw secret values. |
 | Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
 | Updated at / by | DateTime + Actor | Yes | Last update metadata. | System generated. |
 | Tags / metadata | Map | No | Extensible module metadata. | Validated by metadata schema. |
+
+## Entity: `Asset`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Name / title | String | Yes | Human-readable name. | Unique where required by policy. |
+| Asset type | Enum | Yes | Asset category (e.g. hardware, virtual, cloud, license, data store). | From configured asset type taxonomy. |
+| Status | Enum | Yes | Lifecycle state. | Must match component state model. |
+| Owner | User / Team / Role | Yes | Accountable owner. | Must resolve to active identity or role. |
+| Criticality | Enum | Conditional | Business/operational criticality. | One of: low, medium, high, critical. |
+| Environment | Reference | Conditional | Environment hosting the asset. | Must resolve to a registered Environment. |
+| Data classification | Enum | Conditional | Classification of data on the asset. | Must use platform classification taxonomy. |
+| Source-of-truth confidence | Decimal (0–1) | Conditional | Confidence in the asset record. | 0.0–1.0. |
+| Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
+| Updated at / by | DateTime + Actor | Yes | Last update metadata. | System generated. |
+
+## Entity: `Drift record`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Affected CI / Asset | Reference | Yes | The configuration item or asset that drifted. | Must resolve to a registered CI/Asset. |
+| Detected at / by | DateTime + Actor | Yes | When and by which discovery source the drift was detected. | System generated. |
+| Drift classification | Enum | Yes | Nature of the drift. | One of: addition, removal, modification, unauthorized, undeclared. |
+| Declared vs discovered diff | Structured | Yes | The difference between declared and discovered state. | Captured as a field-level diff. |
+| Confidence | Decimal (0–1) | Yes | Confidence that the drift is real (not a discovery artefact). | 0.0–1.0. |
+| Disposition | Enum | Yes | How the drift is resolved. | One of: intended, remediate, rollback, waive, raise-change. |
+| Reconciliation evidence | List of references | Conditional | Evidence supporting the disposition. | Required for waive/intended dispositions. |
+| Owner | User / Team / Role | Yes | Accountable owner of the drift resolution. | Must resolve to active identity or role. |
+
+## Entity: `Service`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Name / title | String | Yes | Human-readable service name. | Unique within tenant. |
+| Status | Enum | Yes | Lifecycle state. | Must match component state model. |
+| Owner | User / Team / Role | Yes | Accountable owner. | Must resolve to active identity or role. |
+| Criticality | Enum | Conditional | Business/operational criticality. | One of: low, medium, high, critical. |
+| Realised by | List of references | Conditional | Configuration items that realise the service. | Each must resolve to a registered CI. |
+| Interfaces | List of references | No | Interfaces this service exposes or consumes. | Each must resolve to a registered Interface. |
+| Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
+| Updated at / by | DateTime + Actor | Yes | Last update metadata. | System generated. |
 
 ## 6.3 Relationships
 
@@ -429,6 +531,11 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | included-in | Record | Baseline / Release / Work Package | N:N | Conditional | Scope, baseline, release, or package membership. |
 | verifies | Test / Evidence | Requirement | N:N | Conditional | Verification coverage. |
 | affects | Risk / Vulnerability / Change | Asset / Release / Requirement | N:N | Conditional | Impact and risk propagation. |
+| depends-on | Service / Configuration item / Interface | Configuration item / Service | N:N | Conditional | Logical dependency for topology and impact (`SPMS-TRACE-GRAPH-REL-007`). |
+| hosted-on | Configuration item / Service | Asset / Environment | N:N | Conditional | Physical/host topology (`SPMS-TRACE-GRAPH-REL-017`). |
+| connected-to | Configuration item / Interface | Configuration item | N:N | Conditional | Network/interface topology (`SPMS-TRACE-GRAPH-REL-018`). |
+| backed-up-by | Configuration item / Asset | Backup / Job | N:N | Conditional | Recoverability topology (`SPMS-TRACE-GRAPH-REL-019`). |
+| monitored-by | Configuration item / Service | Observability signal | N:N | Conditional | Operational monitoring coverage (`SPMS-TRACE-GRAPH-REL-020`). |
 
 ## 6.4 Applicability and Variants
 
@@ -971,12 +1078,14 @@ Implement as part of the modular monolith initially, with clear API boundaries a
 
 ## 22.1 Source Coverage Checklist
 
-This specification covers the requested module scope: Configuration item registry, Asset inventory, Environment registry and lifecycle, Topology and relationship model, Baseline and configuration control, Discovery and synchronization, Drift detection and reconciliation, Dependency and impact management.
+This specification covers the requested module scope: Configuration item registry, Asset inventory, Environment registry and lifecycle, Topology and relationship model, Baseline and configuration control, Discovery and synchronization, Drift detection and reconciliation, Dependency and impact management, Configuration versioning, Configuration change control.
 
 ## 22.2 Specialized Rules
 
 - CI records must support service mapping, topology, ownership, criticality, data classification, and source-of-truth confidence.
-- Drift workflow must classify drift, investigate, approve as intended, remediate, rollback, waive, or create a change.
-- Discovery must reconcile manual, cloud, Git/IaC, CI/CD, monitoring, and scanner sources.
-- Dependency impact must support failure, change, vulnerability, and end-of-life analysis.
+- Drift workflow must classify drift, investigate, and reach a disposition of intended, remediate, rollback, waive, or raise-change; each drift is captured as a `Drift record` with a declared-vs-discovered diff and confidence score.
+- Discovery must reconcile manual, cloud, Git/IaC, CI/CD, monitoring, and scanner sources, assigning a source-of-truth confidence to each reconciled CI/Asset.
+- Every controlled configuration change must capture a new immutable version (CAP-009) and, for baselined/controlled items, pass governed change control (CAP-010) before being applied.
+- Environment readiness checks must cover health, capacity, versions, configuration, secret references, dependencies, data state, and monitoring coverage before an environment is declared ready.
+- Dependency impact must support failure, change, vulnerability, and end-of-life analysis across the typed topology relationships (`depends-on`, `hosted-on`, `connected-to`, `backed-up-by`, `monitored-by`).
 - Import and migration for this component must follow the shared pipeline defined in `SPMS-STD-MIG`.

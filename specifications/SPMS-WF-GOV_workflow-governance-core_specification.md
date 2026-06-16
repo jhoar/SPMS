@@ -14,7 +14,7 @@
 | Reviewers | SPMS Architecture Review Board |
 | Approvers | Engineering Director; Programme Technical Authority |
 | Date created | 2026-05-17 |
-| Last updated | 2026-06-14 |
+| Last updated | 2026-06-16 |
 | Authoritative | Yes |
 | Supersedes | SPMS-SUB-003 |
 | Specification register | SPMS-INDEX |
@@ -166,6 +166,8 @@ Workflow & Governance Core is a shared foundation service in the modular Softwar
 | SPMS-WF-GOV-CAP-006 | SLA and escalation management | Provides sla and escalation management for Workflow & Governance Core. | Should | Yes |
 | SPMS-WF-GOV-CAP-007 | Waiver and exception routing | Provides waiver and exception routing for Workflow & Governance Core. | Should | Yes |
 | SPMS-WF-GOV-CAP-008 | Policy decision logging | Provides policy decision logging for Workflow & Governance Core. | Should | Yes |
+| SPMS-WF-GOV-CAP-009 | Electronic approval evidence (e-signature) | Captures electronic-signature metadata binding an approval decision to an exact record version. | Should | No |
+| SPMS-WF-GOV-CAP-010 | Workflow analytics | Provides analytics over workflow throughput, approval latency, and bottlenecks. | Should | No |
 
 ## 4.2 Capability Details
 
@@ -345,6 +347,50 @@ Workflow & Governance Core is a shared foundation service in the modular Softwar
 | Metrics produced | Volume, throughput, cycle time, aging, backlog, readiness, evidence completeness, approval latency, exception count, and trend indicators. |
 | Configuration options | Field schema, workflow, roles, approval policy, retention, notifications, views, import mappings, and automation rules. |
 
+## Capability: `Electronic approval evidence (e-signature)`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-WF-GOV-CAP-009 |
+| Purpose | Capture electronic-signature metadata for approval decisions, binding each signature to the exact record version approved so the approval is verifiable and non-repudiable. |
+| Trigger | Event-driven (on approval decision) / API |
+| Primary users | Approver; Owner; Auditor; Automation actor |
+| Inputs | Approval decision, signer identity, signing intent, signature method, and the bound record version and content hash. |
+| Outputs | Signature metadata attached to the approval decision, `signature`-type evidence (`SPMS-EVID-AUDIT`), and audit events. |
+| Preconditions | Approver is authenticated; the approval request and target record version exist. |
+| Postconditions | The approval carries verifiable signature metadata bound to a specific record version and hash. |
+| Main workflow | On approval, capture signer identity, timestamp, intent statement, method, record version, and content hash; generate a non-repudiation token; store as evidence; emit audit/event records. |
+| Alternate workflows | Cryptographic signature with certificate reference; delegated signing (recorded against original authority); re-signature after record change. |
+| Error / exception handling | Reject signatures whose bound record version/hash does not match the current approved version; preserve invalidated-signature evidence. |
+| Related records | Approval request, ApprovalDecision; evidence; trace links. |
+| Required evidence | Signature metadata and the bound record-version hash. |
+| Required approvals | The approval being signed; no separate approval for the signature itself. |
+| Audit requirements | Audit signature capture, method, and any verification failures. |
+| Metrics produced | Signature coverage of controlled approvals and verification-failure count. |
+| Configuration options | Signature method policy (typed vs cryptographic), certificate sources, and intent-statement templates. |
+
+## Capability: `Workflow analytics`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-WF-GOV-CAP-010 |
+| Purpose | Provide analytics over workflow throughput, approval latency, gate pass/fail rates, SLA compliance, and bottlenecks. |
+| Trigger | Scheduled / On demand / Event-driven |
+| Primary users | Administrator; Owner; Reviewer; Manager; Auditor |
+| Inputs | Workflow instances, transitions, approvals, gate checks, and SLA clocks. |
+| Outputs | Metrics, trend reports, bottleneck indicators, and dashboards (via `SPMS-REPORT-ANALYTICS`). |
+| Preconditions | Workflow execution data exists. |
+| Postconditions | Workflow performance is measurable and queryable. |
+| Main workflow | Aggregate workflow/approval/gate/SLA events; compute metrics; surface bottlenecks; publish to reporting. |
+| Alternate workflows | Ad-hoc query; export; automation-triggered alerting on threshold breach. |
+| Error / exception handling | Flag incomplete data windows; preserve raw event provenance. |
+| Related records | Workflow instance, Approval request, GateCheck, SLAClock; metrics. |
+| Required evidence | Source event references for reported metrics. |
+| Required approvals | None. |
+| Audit requirements | Audit exports of workflow analytics where sensitive. |
+| Metrics produced | Cycle time, approval latency, gate pass/fail rate, SLA compliance, and rework rate. |
+| Configuration options | Metric definitions, reporting cadence, and alert thresholds. |
+
 ---
 
 # 5. Lifecycle and State Model
@@ -390,9 +436,13 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | State | Primary Workflow & Governance Core record for state management. | Yes |
 | Transition | Primary Workflow & Governance Core record for transition management. | Yes |
 | Approval request | Primary Workflow & Governance Core record for approval request management. | Yes |
+| ApprovalDecision | An individual approver's decision within an approval request, carrying e-signature metadata. | Yes |
+| GateCheck | An evaluation of a gate's required conditions for a specific record. | Yes |
+| Waiver | A governed waiver/deviation against a control, gate, or requirement. | Yes |
 | Gate | Primary Workflow & Governance Core record for gate management. | Shared |
 | Delegation | Primary Workflow & Governance Core record for delegation management. | Shared |
 | SLA policy | Primary Workflow & Governance Core record for sla policy management. | Shared |
+| SLAClock | A running SLA timer instance bound to a record/transition, with pause/resume history. | Shared |
 | Escalation rule | Primary Workflow & Governance Core record for escalation rule management. | Shared |
 
 ## 6.2 Entity Attributes
@@ -411,6 +461,56 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
 | Updated at / by | DateTime + Actor | Yes | Last update metadata. | System generated. |
 | Tags / metadata | Map | No | Extensible module metadata. | Validated by metadata schema. |
+
+## Entity: `Approval request`
+
+The `Approval request` realises the canonical `Approval` schema (`SPMS-DOMAIN-MODEL` §7.3). It
+supports four resolution modes that determine when the request becomes `approved`:
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Record | Reference | Yes | The record requiring approval. | Must resolve to a controlled record. |
+| Approval mode | Enum | Yes | Resolution rule. | One of: single, quorum, parallel, conditional. |
+| Required approvers | List of references | Yes | Users/roles eligible to approve. | Each must resolve to active identity or role. |
+| Quorum | Structured | Conditional | `{required, of}` M-of-N threshold. | Required when mode = quorum; `required` ≤ `of`. |
+| Parallel groups | List of structured | Conditional | Each `{group_id, approvers, rule}` with rule ∈ all,any. | Required when mode = parallel; all groups must satisfy their rule. |
+| Condition expression | Expression | Conditional | Boolean expression over record attributes selecting the route/approvers. | Required when mode = conditional. |
+| Status | Enum | Yes | One of: pending, approved, rejected, withdrawn, expired. | Resolved per approval mode. |
+| Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
+
+## Entity: `ApprovalDecision`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Approval request | Reference | Yes | The parent approval request. | Must resolve to an open/closed approval request. |
+| Approver | Reference | Yes | The deciding user/role. | Must be in the request's eligible approver set (directly or via delegation). |
+| Decision | Enum | Yes | The decision. | One of: approved, rejected, conditionally_approved. |
+| Decided at | DateTime | Yes | When the decision was made. | System generated. |
+| Notes | String | No | Rationale or conditions. | — |
+| Signer identity | Reference | Conditional | Identity bound to the e-signature. | Required for signed decisions. |
+| Signing intent | String | Conditional | Intent statement asserted at signing. | Required for signed decisions. |
+| Signature method | Enum | Conditional | How the decision was signed. | One of: typed, cryptographic. |
+| Bound record version | Integer | Conditional | The record version the signature attests. | Must match the record version at decision time. |
+| Content hash | String | Conditional | SHA-256 of the bound record content. | Required for signed decisions. |
+| Non-repudiation token | String | Conditional | Token/seal supporting non-repudiation. | Required for signed decisions. |
+| Certificate ref | Reference | Conditional | Signing certificate for cryptographic signatures. | Required when method = cryptographic. |
+
+## Entity: `Waiver`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Affected object | Reference | Yes | The control, gate, requirement, or record being waived. | Must resolve to an eligible object. |
+| Reason | String | Yes | Business and technical rationale. | — |
+| Risk assessment | Structured | Yes | Severity, likelihood, residual risk, and owner. | — |
+| Compensating controls | List of references | Conditional | Controls offsetting residual risk. | Required when risk remains active. |
+| Expiry date | DateTime | Conditional | When the waiver lapses. | Required unless explicitly approved as permanent. |
+| Status | Enum | Yes | One of: requested, approved, rejected, expired, closed. | — |
+| Approval refs | List of references | Conditional | Approval records for the waiver. | Required to approve in controlled/critical profiles. |
+| Owner | User / Team / Role | Yes | Accountable owner. | Must resolve to active identity or role. |
+| Created at / by | DateTime + Actor | Yes | Creation metadata. | System generated. |
 
 ## 6.3 Relationships
 
@@ -965,12 +1065,15 @@ Implement as a shared internal service / platform substrate with APIs and projec
 
 ## 22.1 Source Coverage Checklist
 
-This specification covers the requested module scope: Workflow engine, Approval engine, Gate engine, Delegation and authority management, Separation-of-duties enforcement, SLA and escalation management, Waiver and exception routing, Policy decision logging.
+This specification covers the requested module scope: Workflow engine, Approval engine, Gate engine, Delegation and authority management, Separation-of-duties enforcement, SLA and escalation management, Waiver and exception routing, Policy decision logging, Electronic approval evidence (e-signature), Workflow analytics.
 
 ## 22.2 Specialized Rules
 
 - Workflow definitions must be versioned and validated before activation.
 - Approval and gate decisions must be reusable across modules and produce evidence/audit records.
-- Delegation must be time-bounded, scoped, auditable, and compatible with SoD constraints.
+- The approval engine must support single, quorum (M-of-N), parallel (multiple approver groups, each all/any), and conditional (route selected by record attributes) approval modes.
+- Controlled approval decisions must capture electronic-signature metadata (signer identity, timestamp, intent, method, bound record version, content hash, non-repudiation token) bound to the exact approved record version; a signature whose bound version/hash no longer matches is invalid.
+- No controlled record may enter approved, baselined, released, accepted, waived, or retired without passing the workflow engine; automated gates may recommend pass/fail but controlled approvals remain human unless governance explicitly permits.
+- Delegation must be time-bounded, scoped, auditable, and compatible with SoD constraints; delegation is recorded as evidence and never erases the original authority.
 - SLA timers must support business calendars, pause/resume, escalations, and reporting.
 - The Low-risk bulk profile is defined as Level 1.5 — above Lightweight (no automation) but below Standard (full human review). It applies only to record types and field changes explicitly whitelisted by a project administrator; the rules engine must log each automated approval as a human-delegated automation event via SPMS-EVID-AUDIT.

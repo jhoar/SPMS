@@ -14,7 +14,7 @@
 | Reviewers | SPMS Architecture Review Board |
 | Approvers | Engineering Director; Programme Technical Authority |
 | Date created | 2026-05-17 |
-| Last updated | 2026-06-14 |
+| Last updated | 2026-06-16 |
 | Authoritative | Yes |
 | Supersedes | SPMS-SUB-004 |
 | Specification register | SPMS-INDEX |
@@ -166,6 +166,8 @@ Traceability Graph Core is a shared foundation service in the modular Software P
 | SPMS-TRACE-GRAPH-CAP-006 | Coverage analysis | Provides coverage analysis for Traceability Graph Core. | Should | Yes |
 | SPMS-TRACE-GRAPH-CAP-007 | Suspect link management | Provides suspect link management for Traceability Graph Core. | Should | Yes |
 | SPMS-TRACE-GRAPH-CAP-008 | Historical graph snapshots | Provides historical graph snapshots for Traceability Graph Core. | Should | Yes |
+| SPMS-TRACE-GRAPH-CAP-009 | Graph query API | Provides a bounded, permission-aware query API for graph traversal and matrices. | Should | Yes |
+| SPMS-TRACE-GRAPH-CAP-010 | Traceability health metrics | Computes coverage, suspect-link, and orphan metrics for traceability health. | Should | No |
 
 ## 4.2 Capability Details
 
@@ -345,6 +347,50 @@ Traceability Graph Core is a shared foundation service in the modular Software P
 | Metrics produced | Volume, throughput, cycle time, aging, backlog, readiness, evidence completeness, approval latency, exception count, and trend indicators. |
 | Configuration options | Field schema, workflow, roles, approval policy, retention, notifications, views, import mappings, and automation rules. |
 
+## Capability: `Graph query API`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-TRACE-GRAPH-CAP-009 |
+| Purpose | Provide a bounded, permission-aware query API for traversing the trace graph, generating matrices, and producing topology and impact views without exposing records the caller cannot read. |
+| Trigger | API / Event-driven |
+| Primary users | Engineer; Reviewer; Auditor; Automation actor |
+| Inputs | Query (start nodes, link-type filters, depth bound, point-in-time/baseline), and caller permissions. |
+| Outputs | Permission-filtered node/edge sets, matrices, and topology/impact projections. |
+| Preconditions | Caller is authenticated; query is within configured bounds. |
+| Postconditions | Results reflect only permitted records and respect the requested point-in-time/baseline. |
+| Main workflow | Validate and bound the query; traverse the graph projection; filter by permission; assemble the result; emit query audit where sensitive. |
+| Alternate workflows | Historical traversal at a named baseline; export; automation-driven coverage query. |
+| Error / exception handling | Reject unbounded/over-broad queries; return partial results with a truncation flag; preserve query provenance. |
+| Related records | Graph node, Graph edge, Link type, Trace matrix, Graph snapshot. |
+| Required evidence | Query audit records for sensitive traversals. |
+| Required approvals | None. |
+| Audit requirements | Audit sensitive or exported query results. |
+| Metrics produced | Query latency, traversal size, and truncation rate. |
+| Configuration options | Depth/size bounds, permitted query shapes, and audit policy. |
+
+## Capability: `Traceability health metrics`
+
+| Field | Description |
+|---|---|
+| Capability ID | SPMS-TRACE-GRAPH-CAP-010 |
+| Purpose | Compute traceability health metrics — coverage, suspect-link counts, orphaned/invalid links, and required-coverage gaps — to surface gaps before gates and audits. |
+| Trigger | Scheduled / Event-driven / On demand |
+| Primary users | Reviewer; Auditor; Manager; Automation actor |
+| Inputs | Link set, coverage rules, registry validity rules, and record lifecycle states. |
+| Outputs | Health metrics, gap lists, and reports (via `SPMS-REPORT-ANALYTICS`). |
+| Preconditions | Links and coverage rules exist. |
+| Postconditions | Traceability health is measurable and gaps are actionable. |
+| Main workflow | Evaluate coverage rules; count suspect/invalid/orphan links; compute required-coverage gaps; publish metrics; emit events. |
+| Alternate workflows | Ad-hoc gap query; export; automation alert on threshold breach. |
+| Error / exception handling | Flag incomplete data; preserve source-link provenance. |
+| Related records | Coverage rule, Suspect link, Link type, Trace matrix; metrics. |
+| Required evidence | Source-link references for reported metrics. |
+| Required approvals | None. |
+| Audit requirements | Audit exports of health metrics where sensitive. |
+| Metrics produced | Coverage %, suspect-link count, invalid-link count, and orphan count. |
+| Configuration options | Coverage thresholds, metric definitions, and alerting. |
+
 ---
 
 # 5. Lifecycle and State Model
@@ -392,6 +438,10 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | Coverage rule | Primary Traceability Graph Core record for coverage rule management. | Shared |
 | Graph snapshot | Primary Traceability Graph Core record for graph snapshot management. | Shared |
 | Suspect link | Primary Traceability Graph Core record for suspect link management. | Shared |
+| Topology view | A saved, bounded topology/impact projection over the graph. | Shared |
+
+The `Link type` entity is the component-owned realisation of the relationship registry in
+`SPMS-DOMAIN-MODEL` §5; each link instance realises the `TraceLink` schema (`SPMS-DOMAIN-MODEL` §7.6).
 
 ## 6.2 Entity Attributes
 
@@ -410,6 +460,35 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 | Updated at / by | DateTime + Actor | Yes | Last update metadata. | System generated. |
 | Tags / metadata | Map | No | Extensible module metadata. | Validated by metadata schema. |
 
+## Entity: `Link type`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | String | Yes | Registry identifier. | Must be a registered `SPMS-TRACE-GRAPH-REL-NNN` from `SPMS-DOMAIN-MODEL` §5. |
+| Name | String | Yes | Human-readable link-type name (e.g. `verifies`). | Matches the registry. |
+| Allowed source types | List | Yes | Record types permitted as the source. | Validated on link creation. |
+| Allowed target types | List | Yes | Record types permitted as the target. | Validated on link creation. |
+| Cardinality | Enum | Yes | Permitted cardinality. | One of: 1:1, 1:N, N:1, N:N (per registry). |
+| Cross-project allowed | Boolean | Yes | Whether the link may span projects. | Default false for scoped types. |
+| Cross-tenant allowed | Boolean | Yes | Whether the link may span tenants. | Default false; tenant isolation boundary. |
+| Required coverage | String | Conditional | When this link type is required for coverage. | From registry "Required coverage". |
+| Invalidation rule | String | Yes | When a link of this type becomes `invalid`. | E.g. endpoint retired/deleted, or cardinality violated. |
+
+## Entity: `Suspect link`
+
+| Attribute | Type | Required? | Description | Validation rules |
+|---|---|---|---|---|
+| ID | UUID / String | Yes | Stable unique identifier. | Immutable; globally unique within tenant. |
+| Affected link | Reference | Yes | The trace link marked suspect. | Must resolve to an active link. |
+| Trigger event | Reference | Yes | The event (e.g. upstream record update) that raised suspicion. | — |
+| Upstream record | Reference | Yes | The changed upstream record. | — |
+| Upstream version | Integer | Yes | The new upstream version that triggered suspicion. | Greater than the link's `source_version`. |
+| Hops | Integer | Yes | Propagation distance from the changed record. | 0 for direct links; ≥1 for cascaded. |
+| Detected at | DateTime | Yes | When suspicion was raised. | System generated. |
+| Reason | String | Yes | Explainable reason for the suspect state. | Required (deterministic, audit-friendly). |
+| Disposition | Enum | Yes | How the suspect link is resolved. | One of: cleared, re-baselined, retracted, pending. |
+| Reviewer | User / Team / Role | Conditional | Who cleared/dispositioned the suspect link. | Required to clear. |
+
 ## 6.3 Relationships
 
 | Relationship | Source entity | Target entity | Cardinality | Required? | Description |
@@ -425,6 +504,28 @@ Records may be reopened only by authorised roles and only with a reason. Approve
 ## 6.4 Applicability and Variants
 
 Records must support applicability by project, product, release, customer, tenant, environment, platform, region, configuration, variant, and governance profile. Applicability is inherited from parent records unless overridden by controlled variant rules.
+
+## 6.5 Link Type Cardinality and Validity Rules
+
+Every link instance is validated against its `Link type` rules, which derive from the registry in
+`SPMS-DOMAIN-MODEL` §5. The table below summarises the cardinality and the key validity rules per
+registered link type; the registry remains authoritative.
+
+| Link type | Cardinality | Allowed source → target | Cross-project? | Becomes invalid when |
+|---|---|---|---|---|
+| `SPMS-TRACE-GRAPH-REL-001` derives-from | N:N | Requirement → Need/Decision/Requirement | Yes | Target retired without supersession. |
+| `SPMS-TRACE-GRAPH-REL-003` implements | N:N | Work/Build/Code → Requirement/Decision | Yes | Target retired or source deleted. |
+| `SPMS-TRACE-GRAPH-REL-004` verifies | N:N | Test/Evidence → Requirement | Yes | Requirement retired or evidence revoked. |
+| `SPMS-TRACE-GRAPH-REL-007` depends-on | N:N | Service → API/DB/Service | Yes | Endpoint decommissioned. |
+| `SPMS-TRACE-GRAPH-REL-008` deployed-to | N:N | Component → Environment | Yes | Environment retired. |
+| `SPMS-TRACE-GRAPH-REL-011` included-in | N:N | Requirement/Issue → Release | No (project-scoped) | Release closed/cancelled. |
+| `SPMS-TRACE-GRAPH-REL-013` approved-by | N:N | Baseline/Record → Authority | No | Authority revoked. |
+| `SPMS-TRACE-GRAPH-REL-015` supersedes | 1:N | Record → Record | Yes | Superseding record itself retired. |
+| `SPMS-TRACE-GRAPH-REL-016` governed-by | N:N | Record → Workflow/Policy/Gate | No | Governing workflow/policy deprecated. |
+
+Links that violate cardinality, cross a disallowed project/tenant boundary, or whose endpoint is
+retired/deleted are set to `validity_state = invalid` and surfaced by the traceability health
+metrics (CAP-010).
 
 ---
 
@@ -963,12 +1064,13 @@ Implement as a shared internal service / platform substrate with APIs and projec
 
 ## 22.1 Source Coverage Checklist
 
-This specification covers the requested module scope: Relationship registry, Bidirectional linking, Impact analysis, Traceability matrices, Topology graph, Coverage analysis, Suspect link management, Historical graph snapshots, Historical Graph Explorer (point-in-time and named-baseline visual traversal).
+This specification covers the requested module scope: Relationship registry, Bidirectional linking, Impact analysis, Traceability matrices, Topology graph, Coverage analysis, Suspect link management, Historical graph snapshots, Historical Graph Explorer (point-in-time and named-baseline visual traversal), Graph query API, Traceability health metrics.
 
 ## 22.2 Specialized Rules
 
-- Supported relationship types must be controlled and versioned.
+- Supported relationship types must be controlled and versioned, with cardinality and validity rules per link type derived from the `SPMS-DOMAIN-MODEL` §5 registry (see §6.5).
+- Each trace link carries `rationale`, `confidence`, and `validity_state`; links violating cardinality/validity rules or with a retired/deleted endpoint are set to `invalid`.
 - Graph query model must support bounded traversal, matrix generation, topology views, and historical snapshots; the Historical Graph Explorer must allow auditors to traverse the graph as it existed at any named baseline, release, deployment, or audit-period boundary without modifying live data.
-- Suspect link algorithm marks downstream links suspect when approved upstream records change.
+- Suspect-link propagation must be deterministic and explainable for audit: when an upstream record's `version` increments above a link's `source_version`, direct links are marked `suspect` (hops = 0) with a recorded reason; suspicion may cascade up to a configured number of hops (each with an incremented hop count and reason); suspicion is cleared only by re-review that re-baselines the link's `source_version`/`target_version`.
 - Impact analysis must include records, evidence, releases, environments, customers, and controls.
 - Substrate correctness invariants for this component (INV-003 graph↔relational consistency; INV-006 permission-aware search consistency) are defined and gated by `SPMS-STD-INVARIANTS`.

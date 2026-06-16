@@ -13,7 +13,7 @@
 | Reviewers | SPMS Architecture Review Board |
 | Approvers | Engineering Director; Programme Technical Authority |
 | Date created | 2026-06-14 |
-| Last updated | 2026-06-14 |
+| Last updated | 2026-06-16 |
 | Applies to | Every component specification |
 
 ---
@@ -105,9 +105,18 @@ suspect state (`SPMS-TRACE-GRAPH`).
 | `SPMS-TRACE-GRAPH-REL-013` | approved-by | Baseline/Record → Authority | N:N | For controlled approvals |
 | `SPMS-TRACE-GRAPH-REL-014` | produced-by | Evidence/Artifact/Metric → Job/Pipeline/Automation | N:N | For provenance |
 | `SPMS-TRACE-GRAPH-REL-015` | supersedes | Record → Record | 1:N | On controlled replacement |
+| `SPMS-TRACE-GRAPH-REL-016` | governed-by | Record → Workflow/Policy/Gate | N:N | For controlled-process binding |
+| `SPMS-TRACE-GRAPH-REL-017` | hosted-on | Configuration item/Service → Asset/Environment | N:N | For physical/host topology |
+| `SPMS-TRACE-GRAPH-REL-018` | connected-to | Configuration item/Interface → Configuration item | N:N | For network/interface topology |
+| `SPMS-TRACE-GRAPH-REL-019` | backed-up-by | Configuration item/Data store → Backup/Job | N:N | For recoverability topology |
+| `SPMS-TRACE-GRAPH-REL-020` | monitored-by | Configuration item/Service → Observability signal | N:N | For operational coverage |
 
 New link types are added here with the next free identifier; they are never invented inside a
-component specification.
+component specification. Link types REL-016…020 were added by the detail-harvest backlog
+(`DETAIL-HARVEST-BACKLOG` items H-01/H-02): `governed-by` supports release change-control and
+workflow binding; the topology links (`hosted-on`, `connected-to`, `backed-up-by`, `monitored-by`)
+support configuration/asset topology that was previously over-loaded onto `depends-on`. Components
+that only need a coarse dependency may continue to use `depends-on (REL-007)`.
 
 # 6. Conformance
 
@@ -119,7 +128,7 @@ registered link types in their "Required Trace Links" sections, and map their li
 
 # 7. Canonical Entity Schemas
 
-Concrete field-by-field schemas for the 17 canonical entities. Entities that are controlled records
+Concrete field-by-field schemas for the canonical entities. Entities that are controlled records
 extend `Record` (§7.1) and inherit all Common Record Model fields (§3); their tables list only
 additional fields. Entities that are not controlled records (e.g. `AuditEvent`, `IntegrationEvent`,
 `TraceLink`) define their full field sets independently.
@@ -258,6 +267,20 @@ additional fields in `metadata`.
 | `granted_at` | timestamp | Yes | Immutable | — |
 | `expires_at` | timestamp | No | Null for permanent grants | Required for delegated/time-bounded grants |
 
+#### Authorization model (RBAC + ABAC)
+
+Effective authorization is resolved by `SPMS-PLAT-CORE` (see `SPMS-PLAT-CORE` §13) by combining
+role-based grants (above) with attribute-based rules. Permissions resolve in a fixed inheritance
+order, most general to most specific, with the most specific applicable rule winning on conflict:
+
+`tenant → project/product → team → object (record) → field/action override`
+
+Attribute-based access control (ABAC) evaluates these attributes when a role grant alone is
+insufficient: `classification` of the target vs the principal's `classification_clearance`;
+`project_id` / `team_ids` membership; the project or record `governance_profile`; and record
+`lifecycle_state` (e.g. baselined records are read-only outside a change request). A field-level
+override may further restrict (never broaden) access to individual fields of a record type.
+
 ---
 
 ## 7.3 Governance entities (SPMS-WF-GOV)
@@ -293,10 +316,19 @@ additional fields in `metadata`.
 | `requested_by` | string | Yes | Actor id | — |
 | `requested_at` | timestamp | Yes | Immutable | — |
 | `required_approvers` | array of strings | Yes | User ids or Role ids | — |
-| `decisions` | array of objects | No | Each: `{approver_id, decision, decided_at, notes}` | `decision` one of: `approved`, `rejected`, `conditionally_approved` |
+| `approval_mode` | string | Yes | One of: `single`, `quorum`, `parallel`, `conditional` | Default `single`; selects the resolution rule below |
+| `quorum` | object | No | `{required, of}` — M-of-N threshold | Required when `approval_mode = quorum`; status becomes `approved` once `required` distinct approvers approve |
+| `parallel_groups` | array of objects | No | Each: `{group_id, approvers, rule}` where `rule` ∈ `all`,`any` | Required when `approval_mode = parallel`; all groups must satisfy their rule |
+| `condition_expr` | string | No | Boolean expression over record attributes (e.g. `classification = restricted OR value > 1e6`) | Required when `approval_mode = conditional`; selects the approver set/route |
+| `decisions` | array of objects | No | Each: `{approver_id, decision, decided_at, notes, signature}` | `decision` one of: `approved`, `rejected`, `conditionally_approved` |
 | `status` | string | Yes | One of: `pending`, `approved`, `rejected`, `withdrawn`, `expired` | — |
 | `expiry` | timestamp | No | Null for non-expiring approvals | — |
 | `evidence_refs` | array of strings | No | Evidence record ids linked to this approval decision | — |
+
+The `signature` object inside a decision carries electronic-signature metadata (see `SPMS-WF-GOV`
+§9): `{signer_id, signed_at, intent_statement, method (`typed`|`cryptographic`), record_version,
+content_hash, non_repudiation_token, certificate_ref}`. The bound `record_version` and
+`content_hash` make the signature verifiable against the exact record state that was approved.
 
 ---
 
@@ -333,11 +365,35 @@ additional fields in `metadata`.
 | `event_type` | string | Yes | Registered event type (e.g. `RecordCreated`, `StateChanged`, `ApprovalCompleted`) | — |
 | `actor_id` | string | Yes | User id or service id that caused the event | — |
 | `actor_type` | string | Yes | One of: `user`, `automation`, `system` | — |
-| `payload` | object | Yes | Event-type-specific detail; schema versioned | — |
+| `payload` | object | Yes | Event-type-specific detail; schema versioned. For mutations, includes a `before`/`after` summary of changed fields | — |
 | `schema_version` | string | Yes | Semantic version of the payload schema | e.g. `1.0.0` |
 | `occurred_at` | timestamp (ISO 8601, microsecond precision) | Yes | Immutable; time of the originating mutation | — |
 | `prev_hash` | string | Yes | SHA-256 of the previous `AuditEvent` in tenant log | Hash chain for tamper resistance (SPMS-STD-SEC §7) |
 | `correlation_id` | string | No | Id linking causally related events | — |
+
+### EvidencePackage
+
+An `EvidencePackage` is a reproducible, immutable composition of evidence assembled for an audit,
+gate, or release. It must be reconstructable from the stored member records and object references
+(see `SPMS-EVID-AUDIT` §9). Corrections are made by superseding the package, never by silent
+in-place replacement.
+
+| Field | Type | Required | Constraints | Notes |
+|---|---|---|---|---|
+| `package_id` | string | Yes | Unique within tenant; immutable | — |
+| `tenant_id` | string | Yes | Immutable | — |
+| `project_id` | string | No | Null for tenant-level packages | — |
+| `title` | string | Yes | 1–500 characters | — |
+| `purpose` | string | Yes | One of: `audit`, `gate`, `release`, `regulatory`, `custom` | — |
+| `members` | array of objects | Yes | Each: `{evidence_id, object_ref, content_hash}` | The exact evidence items + content hashes |
+| `approval_refs` | array of strings | No | Approval ids included in the package | — |
+| `audit_slice_ref` | string | No | Reference to the audit-event range included | Enables historical reconstruction |
+| `baseline_refs` | array of strings | No | Baselines the package attests | — |
+| `composition_hash` | string | Yes | SHA-256 over the ordered member hashes | Verifies package integrity/reproducibility |
+| `status` | string | Yes | One of: `draft`, `sealed`, `superseded` | Only `sealed` packages are citable as audit evidence |
+| `sealed_at` | timestamp | No | Set on seal; immutable thereafter | — |
+| `sealed_by` | string | No | Actor id; immutable | — |
+| `superseded_by` | string | No | Id of superseding package | Never deletes history |
 
 ---
 
@@ -397,6 +453,9 @@ A `Version` is an immutable snapshot of a single `Record` at a specific `version
 | `target_version` | integer | Yes | Version of the target at link creation | — |
 | `suspect` | boolean | Yes | Default false; set true when upstream record changes after link creation | — |
 | `suspect_reason` | string | No | Human-readable explanation; required when `suspect=true` | — |
+| `rationale` | string | No | Why the link exists; recommended for controlled/critical profiles | Supports explainable traceability |
+| `confidence` | number | No | 0.0–1.0; default 1.0 for manually asserted links | Lower for AI-suggested/auto-derived links (`SPMS-AUTO-AI`) |
+| `validity_state` | string | Yes | One of: `valid`, `suspect`, `invalid` | `invalid` when an endpoint is retired/deleted or a cardinality/validity rule is violated |
 | `evidence_refs` | array of strings | No | Evidence supporting the relationship | — |
 | `created_by` | string | Yes | Actor id; immutable | — |
 | `created_at` | timestamp | Yes | Immutable | — |
